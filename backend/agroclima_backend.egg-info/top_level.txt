@@ -1,6 +1,0 @@
-database
-envloader
-main
-models
-pdf_generator
-security

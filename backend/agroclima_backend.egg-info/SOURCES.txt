@@ -1,7 +1,0 @@
-README.md
-pyproject.toml
-agroclima_backend.egg-info/PKG-INFO
-agroclima_backend.egg-info/SOURCES.txt
-agroclima_backend.egg-info/dependency_links.txt
-agroclima_backend.egg-info/requires.txt
-agroclima_backend.egg-info/top_level.txt

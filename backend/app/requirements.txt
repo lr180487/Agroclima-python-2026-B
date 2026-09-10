@@ -1,7 +1,0 @@
-fastapi>=0.110
-uvicorn[standard]>=0.29
-sqlalchemy>=2.0
-pyjwt>=2.8
-email-validator>=2.1
-# Para PostgreSQL real, descomenta:
-# psycopg2-binary>=2.9
