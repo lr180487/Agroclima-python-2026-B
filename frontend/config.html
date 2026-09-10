@@ -20,8 +20,6 @@
     .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
     .toggle:checked::after { left: 23px; }
   </style>
-  <link rel="stylesheet" href="theme.css" />
-  <script src="theme.js"></script>
 </head>
 <body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
@@ -32,11 +30,9 @@
         <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
       </a>
       <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
-        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="dashboard.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
         <a href="mapa.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🗺️ Mapa</a>
         <a href="notificaciones.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📧 Notificaciones</a>
-        <a href="api.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🔌 API</a>
-        <a href="estado.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📡 Estado</a>
         <a href="config.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">⚙️ Configuración</a>
       </nav>
       <div id="userBadge"></div>
@@ -208,22 +204,6 @@
               <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">● Conectado</span>
             </div>
           </div>
-
-          <!-- Backend Google Apps Script -->
-          <div class="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-sm font-bold">☁️ Backend Google Apps Script <span class="text-xs font-normal text-slate-400">(alternativo al FastAPI local)</span></p>
-              <span id="gasBadge" class="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-xs font-bold">● No configurado</span>
-            </div>
-            <p class="text-xs text-slate-400 mb-3">Pega la URL /exec de tu web app (ver <code class="bg-slate-200 px-1 rounded">backend-gas/README.md</code>). El login y los datos irán a Google: PostgreSQL vía JDBC o fallback a Sheets. Déjalo vacío para usar el backend local.</p>
-            <div class="flex gap-2">
-              <input id="gasUrl" type="url" placeholder="https://script.google.com/macros/s/AKfy.../exec"
-                class="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-agro-500" />
-              <button id="btnGasTest" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition active:scale-95 whitespace-nowrap">Probar y guardar</button>
-              <button id="btnGasClear" class="px-4 py-2.5 rounded-xl border-2 border-slate-300 text-slate-500 text-xs font-bold hover:bg-white transition">Quitar</button>
-            </div>
-            <p id="gasMsg" class="text-xs mt-2 hidden"></p>
-          </div>
           <div class="mt-5 grid sm:grid-cols-2 gap-3">
             <button onclick="if(confirm('¿Borrar historial de consultas?')){localStorage.removeItem('agroclima_history');alert('Historial eliminado ✅')}"
               class="px-4 py-3 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition">🗑️ Vaciar historial de consultas</button>
@@ -242,7 +222,6 @@
 
   <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">🌱 AgroClima · Configuración protegida por RBAC</footer>
 
-  <script src="gas-client.js"></script>
   <script src="auth.js"></script>
   <script>
     'use strict';
@@ -306,40 +285,6 @@
       });
     }
 
-    // ─── Backend GAS (solo visible para admin en Sistema) ───
-    const gasUrlInput = document.getElementById('gasUrl');
-    if (gasUrlInput) {
-      const gasBadge = document.getElementById('gasBadge');
-      const gasMsg = document.getElementById('gasMsg');
-      function paintGas(ok, text) {
-        gasBadge.className = 'px-3 py-1 rounded-full text-xs font-bold ' + (ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500');
-        gasBadge.textContent = ok ? '● Conectado' : '● No configurado';
-        if (text) { gasMsg.classList.remove('hidden'); gasMsg.className = 'text-xs mt-2 font-semibold ' + (ok ? 'text-green-600' : 'text-red-600'); gasMsg.textContent = text; }
-      }
-      gasUrlInput.value = getGasUrl();
-      if (gasEnabled()) paintGas(true);
-
-      document.getElementById('btnGasTest').addEventListener('click', async () => {
-        const url = gasUrlInput.value.trim();
-        if (!url) { paintGas(false, '⚠️ Ingresa la URL /exec del web app.'); return; }
-        gasMsg.classList.remove('hidden');
-        gasMsg.className = 'text-xs mt-2 font-semibold text-slate-500';
-        gasMsg.textContent = '⏳ Probando conexión con Google Apps Script…';
-        setGasUrl(url);
-        try {
-          const h = await gasHealth();
-          paintGas(true, `✅ Conectado · storage: ${h.storage} · OAuth: ${h.oauth_google}`);
-        } catch (e) {
-          setGasUrl('');
-          paintGas(false, '❌ No respondió: ' + e.message + ' (verifica el despliegue como "Cualquier persona")');
-        }
-      });
-      document.getElementById('btnGasClear').addEventListener('click', () => {
-        setGasUrl(''); gasUrlInput.value = '';
-        paintGas(false, 'Se usará el backend FastAPI local.');
-      });
-    }
-
     // ─── Guardar (localStorage) ───
     document.getElementById('btnSave').addEventListener('click', () => {
       const prefs = {
@@ -372,5 +317,6 @@
       }
     } catch {}
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38767a21af30cdd',t:'MTc4ODk2OTYxNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+</body>
 </html>
