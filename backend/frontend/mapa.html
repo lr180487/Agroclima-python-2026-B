@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroClima · Mapa en tiempo real</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { agro: {50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d'} },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    #map { height: 100%; min-height: 520px; z-index: 1; }
+    .leaflet-popup-content-wrapper { border-radius: 14px; font-family: Inter, sans-serif; }
+    .leaflet-popup-content { margin: 14px 16px; }
+    .parcel-item.active { border-color: #16a34a; background: #f0fdf4; }
+
+    /* ── Dropdown de búsqueda en tiempo real ── */
+    .search-dd {
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem;
+      box-shadow: 0 20px 45px -12px rgba(0,0,0,.25);
+      z-index: 700; max-height: 320px; overflow-y: auto;
+    }
+    .search-dd .dd-item {
+      display: flex; gap: .7rem; align-items: flex-start; width: 100%;
+      text-align: left; padding: .7rem .9rem; font-size: .8rem; color: #334155;
+      border-bottom: 1px solid #f1f5f9; cursor: pointer; background: transparent;
+      transition: background .12s;
+    }
+    .search-dd .dd-item:last-child { border-bottom: none; }
+    .search-dd .dd-item:hover, .search-dd .dd-item.hover { background: #f0fdf4; }
+    .search-dd .dd-item .dd-title { font-weight: 700; color: #1e293b; }
+    .search-dd .dd-item .dd-sub { font-size: .68rem; color: #94a3b8; margin-top: .1rem; }
+    .search-dd .dd-empty { padding: .9rem; font-size: .78rem; color: #94a3b8; text-align: center; }
+    .search-dd::-webkit-scrollbar { width: 6px; }
+    .search-dd::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    .searching-spin {
+      width: 16px; height: 16px; border: 2px solid #dcfce7; border-top-color: #16a34a;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Badge "EN VIVO" ── */
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.75); } }
+
+    /* ── Etiqueta de temperatura en vivo sobre marcadores ── */
+    .temp-badge {
+      background: #1e293b; color: #fff; font-family: Inter, sans-serif;
+      font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+      border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); white-space: nowrap;
+    }
+    .leaflet-control-layers { border-radius: 12px !important; border: 1px solid #e2e8f0 !important; box-shadow: 0 8px 20px -8px rgba(0,0,0,.2) !important; font-family: Inter, sans-serif; }
+  </style>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="theme.js"></script>
+</head>
+<body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ═══════ NAVBAR ═══════ -->
+  <header class="bg-gradient-to-r from-agro-800 via-agro-700 to-emerald-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <a href="landing.html" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
+      </a>
+      <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
+        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="mapa.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">🗺️ Mapa</a>
+        <a href="notificaciones.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📧 Notificaciones</a>
+        <a href="api.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🔌 API</a>
+        <a href="estado.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📡 Estado</a>
+        <a href="config.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">⚙️ Configuración</a>
+      </nav>
+      <div id="userBadge"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+    <!-- ═══════ CABECERA + BUSCADOR EN TIEMPO REAL ═══════ -->
+    <div class="mb-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900 flex items-center gap-3">
+          🗺️ Mapa en tiempo real
+          <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-600 text-[11px] font-black">
+            <span class="live-dot"></span> EN VIVO
+          </span>
+        </h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+          Busca cualquier lugar del mundo · radar de lluvia · temperatura en vivo por parcela ·
+          <span id="lastUpdate" class="font-semibold text-slate-500">--</span>
+        </p>
+      </div>
+
+      <!-- Buscador con autocompletado (restringido a Perú) -->
+      <div class="w-full lg:w-[520px]">
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <input id="mapSearch" type="text" autocomplete="off"
+              placeholder="🔎 Busca cualquier lugar del Perú: distrito, valle, caserío, río…"
+              class="w-full rounded-xl border border-slate-300 pl-4 pr-10 py-3 text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-agro-500 focus:border-agro-500 transition" />
+            <div id="searchSpin" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 searching-spin"></div>
+            <div id="searchDD" class="search-dd hidden"></div>
+          </div>
+          <button id="btnPeruOnly" title="Alternar búsqueda solo en Perú / mundial"
+            class="px-4 py-3 rounded-xl bg-agro-600 text-white border border-agro-600 text-sm font-black shadow-sm transition active:scale-95 whitespace-nowrap">🇵🇪 Solo Perú</button>
+          <button id="btnGeoloc" title="Mi ubicación GPS"
+            class="px-4 py-3 rounded-xl bg-white border border-slate-300 hover:border-agro-500 text-sm font-bold shadow-sm transition active:scale-95">🛰️</button>
+        </div>
+        <!-- Acceso rápido: departamentos del Perú -->
+        <div class="flex gap-2 mt-2 items-center">
+          <select id="deptSelect"
+            class="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-agro-500 transition">
+            <option value="">🏔️ Ir a un departamento del Perú…</option>
+          </select>
+          <span class="text-[10px] text-slate-400 whitespace-nowrap hidden sm:block">24 dptos. + Callao</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-[320px_1fr] gap-5">
+      <!-- ═══════ SIDEBAR PARCELAS ═══════ -->
+      <aside class="space-y-3 lg:max-h-[calc(100vh-230px)] lg:overflow-y-auto pr-1">
+        <div class="flex items-center justify-between">
+          <h2 class="font-bold text-slate-700 text-sm">📌 Mis parcelas (<span id="parcelCount">0</span>)</h2>
+          <span id="editHint" class="text-[11px] text-slate-400"></span>
+        </div>
+        <div id="parcelList" class="space-y-2.5"></div>
+        <div id="noEditMsg" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 font-semibold">
+          🔒 Tu rol solo permite ver parcelas. Para agregar o eliminar necesitas rol Agrónomo o Administrador.
+        </div>
+        <div class="p-3.5 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-500 space-y-1.5">
+          <p class="font-black text-slate-600 uppercase tracking-wide text-[10px]">Capas en tiempo real</p>
+          <p>🌧️ <strong>Radar de lluvia</strong>: precipitación real actualizada cada ~10 min (RainViewer).</p>
+          <p>🌡️ <strong>Temperatura en parcelas</strong>: se refresca automáticamente cada 5 min (Open-Meteo).</p>
+          <p>🛰️ Cambia entre mapa, satélite y topográfico con el control de capas.</p>
+        </div>
+      </aside>
+
+      <!-- ═══════ MAPA ═══════ -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden relative">
+        <div id="map"></div>
+
+        <!-- Panel clima flotante -->
+        <div id="climatePanel" class="hidden absolute top-4 right-4 z-[500] w-72 bg-white/95 backdrop-blur rounded-2xl shadow-2xl border border-slate-200 p-5">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <p id="cpName" class="font-black text-slate-800 text-sm leading-tight">--</p>
+              <p id="cpCoords" class="text-[10px] text-slate-400 font-mono mt-0.5">--</p>
+            </div>
+            <button onclick="closePanel()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+          </div>
+          <div id="cpLoading" class="text-center py-6 text-sm text-slate-400">Consultando Open-Meteo…</div>
+          <div id="cpData" class="hidden">
+            <div class="flex items-center gap-3 mb-3">
+              <span id="cpIcon" class="text-4xl">☀️</span>
+              <div><p id="cpTemp" class="text-2xl font-black leading-none">--</p><p id="cpDesc" class="text-xs text-slate-400 mt-1">--</p></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-400 font-bold text-[10px] uppercase">Humedad</p><p id="cpHum" class="font-black text-sm">--</p></div>
+              <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-400 font-bold text-[10px] uppercase">Viento</p><p id="cpWind" class="font-black text-sm">--</p></div>
+              <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-400 font-bold text-[10px] uppercase">Lluvia 7d</p><p id="cpRain" class="font-black text-sm">--</p></div>
+              <div class="bg-slate-50 rounded-lg p-2.5"><p class="text-slate-400 font-bold text-[10px] uppercase">UV máx</p><p id="cpUV" class="font-black text-sm">--</p></div>
+            </div>
+            <p id="cpRefreshed" class="text-[10px] text-slate-400 mt-2 text-right">↻ --</p>
+            <div id="cpAlert" class="hidden mt-2 p-2.5 rounded-lg bg-red-50 border border-red-200 text-[11px] font-bold text-red-600"></div>
+            <button id="cpSave" class="mt-3 w-full px-4 py-2.5 rounded-xl bg-agro-600 hover:bg-agro-700 text-white text-xs font-black transition">📌 Guardar como parcela</button>
+          </div>
+        </div>
+
+        <!-- Leyenda del radar -->
+        <div id="radarLegend" class="hidden absolute bottom-4 left-4 z-[500] bg-white/95 backdrop-blur rounded-xl shadow-lg border border-slate-200 px-4 py-2.5">
+          <p class="text-[10px] font-black text-slate-500 uppercase tracking-wide mb-1.5">🌧️ Intensidad de lluvia (radar en vivo)</p>
+          <div class="flex items-center gap-0.5">
+            <div class="h-2.5 w-8 rounded-l" style="background:#88eeee"></div>
+            <div class="h-2.5 w-8" style="background:#0099cc"></div>
+            <div class="h-2.5 w-8" style="background:#0044dd"></div>
+            <div class="h-2.5 w-8" style="background:#ffee00"></div>
+            <div class="h-2.5 w-8" style="background:#ff8800"></div>
+            <div class="h-2.5 w-8 rounded-r" style="background:#dd0000"></div>
+          </div>
+          <div class="flex justify-between text-[9px] text-slate-400 mt-0.5"><span>Ligera</span><span>Moderada</span><span>Intensa</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">
+    🗺️ Tiles © <a href="https://www.openstreetmap.org/copyright" class="underline">OpenStreetMap</a> · Satélite: Esri · Radar: <a href="https://www.rainviewer.com" class="underline">RainViewer</a> · Clima: Open-Meteo · Geocoding: Nominatim
+  </footer>
+
+  <script src="gas-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    'use strict';
+    const session = requireAuth('map.view');
+    renderUserBadge();
+    const canEdit = hasPermission('map.edit');
+
+    const PARCELS_KEY = 'agroclima_parcels';
+    const WMO_MAP = {0:['Despejado','☀️'],1:['Mayormente despejado','🌤️'],2:['Parcialmente nublado','⛅'],3:['Nublado','☁️'],45:['Niebla','🌫️'],48:['Niebla','🌫️'],51:['Llovizna','🌦️'],53:['Llovizna','🌦️'],55:['Llovizna densa','🌧️'],61:['Lluvia ligera','🌧️'],63:['Lluvia','🌧️'],65:['Lluvia fuerte','🌧️'],71:['Nieve','🌨️'],80:['Chubascos','🌦️'],81:['Chubascos','🌧️'],82:['Chubascos fuertes','⛈️'],95:['Tormenta','⛈️'],96:['Tormenta c/granizo','⛈️'],99:['Tormenta fuerte','⛈️']};
+
+    if (!canEdit) document.getElementById('noEditMsg').classList.remove('hidden');
+    else document.getElementById('editHint').textContent = 'clic en el mapa para agregar';
+
+    // ─── Parcelas ───
+    function defaultParcels() {
+      return [
+        { id: 1, name: 'Valle del Mantaro', crop: '🥔 Papa', lat: -12.0651, lon: -75.2049 },
+        { id: 2, name: 'Viñedo Ica Sur', crop: '🍇 Uva', lat: -14.0678, lon: -75.7286 },
+        { id: 3, name: 'Cafetal Chanchamayo', crop: '☕ Café', lat: -11.0574, lon: -75.3288 },
+      ];
+    }
+    function getParcels() {
+      try { return JSON.parse(localStorage.getItem(PARCELS_KEY)) || defaultParcels(); }
+      catch { return defaultParcels(); }
+    }
+    function saveParcels(list) { localStorage.setItem(PARCELS_KEY, JSON.stringify(list)); }
+
+    // ═══════════ MAPA + CAPAS EN TIEMPO REAL ═══════════
+    const baseOSM = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap contributors',
+    });
+    const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: '© Esri, Maxar, Earthstar Geographics',
+    });
+    const baseTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17, attribution: '© OpenTopoMap (CC-BY-SA)',
+    });
+
+    const map = L.map('map', { layers: [baseOSM] }).setView([-12.05, -75.20], 6);
+
+    // ── Radar de lluvia EN VIVO (RainViewer) ──
+    let radarLayer = null;
+    let radarTs = null;
+    async function refreshRadar() {
+      try {
+        const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+        const j = await res.json();
+        const frames = j.radar && j.radar.past;
+        if (!frames || !frames.length) return;
+        const latest = frames[frames.length - 1];
+        if (latest.time === radarTs) return; // sin cambios
+        radarTs = latest.time;
+        const url = j.host + latest.path + '/256/{z}/{x}/{y}/2/1_1.png';
+        const wasOn = radarLayer && map.hasLayer(radarLayer);
+        const newLayer = L.tileLayer(url, { opacity: 0.65, attribution: 'Radar © RainViewer' });
+        if (radarLayer) { layersCtl.removeLayer(radarLayer); if (wasOn) map.removeLayer(radarLayer); }
+        radarLayer = newLayer;
+        layersCtl.addOverlay(radarLayer, '🌧️ Radar de lluvia (en vivo)');
+        if (wasOn || radarTs === latest.time && wasOn === undefined) {}
+        if (wasOn) radarLayer.addTo(map);
+        stampUpdate();
+      } catch (e) { console.warn('RainViewer:', e); }
+    }
+
+    const layersCtl = L.control.layers(
+      { '🗺️ Mapa (OSM)': baseOSM, '🛰️ Satélite (Esri)': baseSat, '⛰️ Topográfico': baseTopo },
+      {}, { position: 'topleft', collapsed: true }
+    ).addTo(map);
+
+    map.on('overlayadd', (e) => { if (e.layer === radarLayer) document.getElementById('radarLegend').classList.remove('hidden'); });
+    map.on('overlayremove', (e) => { if (e.layer === radarLayer) document.getElementById('radarLegend').classList.add('hidden'); });
+
+    function stampUpdate() {
+      document.getElementById('lastUpdate').textContent =
+        'actualizado ' + new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ── Marcadores ──
+    const markerIcon = (emoji) => L.divIcon({
+      html: `<div style="background:#16a34a;width:38px;height:38px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(0,0,0,.3);border:3px solid #fff"><span style="transform:rotate(45deg);font-size:17px">${emoji}</span></div>`,
+      className: '', iconSize: [38, 38], iconAnchor: [8, 36], popupAnchor: [11, -34],
+    });
+    const tempIcon = (t) => L.divIcon({
+      html: `<div class="temp-badge">${t}</div>`, className: '', iconSize: [0, 0], iconAnchor: [-6, 44],
+    });
+
+    let markers = {};      // id -> marcador de parcela
+    let tempMarkers = {};  // id -> etiqueta de temperatura en vivo
+    let tempClickMarker = null;
+    let lastClick = null;
+
+    function renderParcels() {
+      const parcels = getParcels();
+      document.getElementById('parcelCount').textContent = parcels.length;
+      Object.values(markers).forEach((m) => map.removeLayer(m));
+      Object.values(tempMarkers).forEach((m) => map.removeLayer(m));
+      markers = {}; tempMarkers = {};
+      const list = document.getElementById('parcelList');
+      list.innerHTML = '';
+      parcels.forEach((p) => {
+        const emoji = p.crop.split(' ')[0];
+        const mk = L.marker([p.lat, p.lon], { icon: markerIcon(emoji) }).addTo(map)
+          .bindPopup(`<strong>${p.name}</strong><br/><span style="font-size:12px">${p.crop} · (${p.lat.toFixed(3)}, ${p.lon.toFixed(3)})</span>`);
+        mk.on('click', () => loadClimate(p.lat, p.lon, p.name));
+        markers[p.id] = mk;
+
+        const div = document.createElement('div');
+        div.className = 'parcel-item bg-white rounded-xl border border-slate-200 p-3.5 cursor-pointer hover:border-agro-500 transition';
+        div.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-bold text-sm text-slate-800">${emoji} ${p.name}</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">${p.crop.substring(p.crop.indexOf(' ') + 1)} · ${p.lat.toFixed(3)}, ${p.lon.toFixed(3)}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span id="ptemp-${p.id}" class="px-2 py-0.5 rounded-full bg-slate-100 text-[11px] font-black text-slate-500">…</span>
+              ${canEdit ? `<button data-del="${p.id}" class="text-red-400 hover:text-red-600 text-xs font-bold px-1">🗑️</button>` : ''}
+            </div>
+          </div>`;
+        div.addEventListener('click', (e) => {
+          if (e.target.dataset.del) return;
+          map.flyTo([p.lat, p.lon], 12, { duration: 1.2 });
+          mk.openPopup();
+          loadClimate(p.lat, p.lon, p.name);
+          document.querySelectorAll('.parcel-item').forEach((el) => el.classList.remove('active'));
+          div.classList.add('active');
+        });
+        const delBtn = div.querySelector('[data-del]');
+        if (delBtn) delBtn.addEventListener('click', () => {
+          if (!confirm(`¿Eliminar parcela "${p.name}"?`)) return;
+          saveParcels(getParcels().filter((x) => x.id !== p.id));
+          renderParcels(); refreshParcelTemps();
+        });
+        list.appendChild(div);
+      });
+    }
+
+    // ── Temperatura EN VIVO por parcela (Open-Meteo, refresco cada 5 min) ──
+    async function refreshParcelTemps() {
+      const parcels = getParcels();
+      if (!parcels.length) return;
+      try {
+        const lats = parcels.map((p) => p.lat).join(',');
+        const lons = parcels.map((p) => p.lon).join(',');
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=temperature_2m,weather_code&timezone=auto`);
+        let data = await res.json();
+        if (!Array.isArray(data)) data = [data];
+        parcels.forEach((p, i) => {
+          const cur = data[i] && data[i].current;
+          if (!cur) return;
+          const t = cur.temperature_2m.toFixed(0) + '°C';
+          const badge = document.getElementById('ptemp-' + p.id);
+          if (badge) { badge.textContent = t; badge.className = 'px-2 py-0.5 rounded-full bg-agro-100 text-[11px] font-black text-agro-800'; }
+          if (tempMarkers[p.id]) map.removeLayer(tempMarkers[p.id]);
+          tempMarkers[p.id] = L.marker([p.lat, p.lon], { icon: tempIcon(t), interactive: false }).addTo(map);
+        });
+        stampUpdate();
+      } catch (e) { console.warn('Temps en vivo:', e); }
+    }
+
+    // ═══════════ BUSCADOR EN TIEMPO REAL — RESTRINGIDO A PERÚ 🇵🇪 ═══════════
+    const searchInput = document.getElementById('mapSearch');
+    const dd = document.getElementById('searchDD');
+    const spin = document.getElementById('searchSpin');
+    let ddItems = [], ddIndex = -1, debounceT = null, searchSeq = 0;
+    let peruOnly = true; // por defecto solo Perú
+
+    // Límites geográficos del Perú (viewbox lon1,lat1,lon2,lat2)
+    const PERU_VIEWBOX = '-81.4,-0.03,-68.6,-18.4';
+    const PERU_BOUNDS = L.latLngBounds([-18.4, -81.4], [-0.03, -68.6]);
+
+    const TYPE_ICONS = { city: '🏙️', town: '🏘️', village: '🏡', hamlet: '🏡', state: '🗾', administrative: '🗾', country: '🌎', river: '🏞️', peak: '⛰️', farm: '🌾', water: '💧', forest: '🌲' };
+
+    // ── Toggle Solo Perú / Mundial ──
+    const btnPeru = document.getElementById('btnPeruOnly');
+    btnPeru.addEventListener('click', () => {
+      peruOnly = !peruOnly;
+      if (peruOnly) {
+        btnPeru.className = 'px-4 py-3 rounded-xl bg-agro-600 text-white border border-agro-600 text-sm font-black shadow-sm transition active:scale-95 whitespace-nowrap';
+        btnPeru.textContent = '🇵🇪 Solo Perú';
+        searchInput.placeholder = '🔎 Busca cualquier lugar del Perú: distrito, valle, caserío, río…';
+        map.flyToBounds(PERU_BOUNDS, { duration: 1.2, padding: [20, 20] });
+      } else {
+        btnPeru.className = 'px-4 py-3 rounded-xl bg-white text-slate-600 border border-slate-300 hover:border-agro-500 text-sm font-black shadow-sm transition active:scale-95 whitespace-nowrap';
+        btnPeru.textContent = '🌎 Mundial';
+        searchInput.placeholder = '🔎 Busca cualquier lugar del mundo…';
+      }
+      const q = searchInput.value.trim();
+      if (q.length >= 3) { spin.classList.remove('hidden'); liveSearch(q); }
+    });
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceT);
+      const q = searchInput.value.trim();
+      if (q.length < 3) { dd.classList.add('hidden'); spin.classList.add('hidden'); return; }
+      spin.classList.remove('hidden');
+      debounceT = setTimeout(() => liveSearch(q), 350);
+    });
+
+    async function liveSearch(q) {
+      const seq = ++searchSeq;
+      try {
+        let url = `https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=es&addressdetails=1&q=${encodeURIComponent(q)}`;
+        if (peruOnly) {
+          // countrycodes=pe restringe a Perú; viewbox+bounded prioriza el territorio
+          url += `&countrycodes=pe&viewbox=${PERU_VIEWBOX}&bounded=1`;
+        }
+        let res = await fetch(url);
+        let results = await res.json();
+        // Fallback: si bounded no arroja nada, reintenta solo con countrycodes=pe
+        if (peruOnly && !results.length) {
+          res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=8&accept-language=es&addressdetails=1&countrycodes=pe&q=${encodeURIComponent(q)}`);
+          results = await res.json();
+        }
+        if (seq !== searchSeq) return; // llegó tarde, descartar
+        spin.classList.add('hidden');
+        renderDD(results);
+      } catch {
+        if (seq === searchSeq) { spin.classList.add('hidden'); dd.classList.add('hidden'); }
+      }
+    }
+
+    function renderDD(results) {
+      dd.innerHTML = '';
+      ddItems = []; ddIndex = -1;
+      if (!results.length) {
+        dd.innerHTML = peruOnly
+          ? '<div class="dd-empty">🇵🇪 Sin resultados en el Perú. Verifica la ortografía o prueba con el nombre del distrito/provincia…</div>'
+          : '<div class="dd-empty">Sin resultados. Prueba con otro término…</div>';
+        dd.classList.remove('hidden');
+        return;
+      }
+      results.forEach((r) => {
+        const parts = r.display_name.split(',');
+        const icon = TYPE_ICONS[r.type] || TYPE_ICONS[r.class] || '📍';
+        // Departamento (state) desde addressdetails para mostrar contexto peruano
+        const dept = r.address && (r.address.state || r.address.region || '');
+        const deptTag = peruOnly && dept ? `<span style="background:#dcfce7;color:#15803d;font-size:.6rem;font-weight:800;padding:1px 7px;border-radius:999px;margin-left:6px">${dept}</span>` : '';
+        const btn = document.createElement('button');
+        btn.className = 'dd-item';
+        btn.innerHTML = `
+          <span style="font-size:1.05rem">${icon}</span>
+          <span>
+            <span class="dd-title">${parts[0]}</span>${deptTag}
+            <div class="dd-sub">${parts.slice(1, 4).join(',').trim() || r.type}</div>
+          </span>`;
+        btn.addEventListener('click', () => pickResult(r));
+        dd.appendChild(btn);
+        ddItems.push({ el: btn, data: r });
+      });
+      dd.classList.remove('hidden');
+    }
+
+    function pickResult(r) {
+      dd.classList.add('hidden');
+      const name = r.display_name.split(',').slice(0, 2).join(',');
+      searchInput.value = name;
+      const lat = +r.lat, lon = +r.lon;
+      map.flyTo([lat, lon], r.type === 'country' ? 6 : r.type === 'state' ? 8 : 12, { duration: 1.4 });
+      if (tempClickMarker) map.removeLayer(tempClickMarker);
+      tempClickMarker = L.marker([lat, lon], { icon: markerIcon('📍') }).addTo(map);
+      loadClimate(lat, lon, name);
+    }
+
+    // Navegación con teclado ↑ ↓ Enter Esc
+    searchInput.addEventListener('keydown', (e) => {
+      if (dd.classList.contains('hidden') || !ddItems.length) {
+        if (e.key === 'Enter') { e.preventDefault(); liveSearch(searchInput.value.trim()); }
+        return;
+      }
+      if (e.key === 'ArrowDown') { e.preventDefault(); ddIndex = (ddIndex + 1) % ddItems.length; highlightDD(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); ddIndex = (ddIndex - 1 + ddItems.length) % ddItems.length; highlightDD(); }
+      else if (e.key === 'Enter') { e.preventDefault(); pickResult(ddItems[ddIndex >= 0 ? ddIndex : 0].data); }
+      else if (e.key === 'Escape') dd.classList.add('hidden');
+    });
+    function highlightDD() {
+      ddItems.forEach((it, i) => it.el.classList.toggle('hover', i === ddIndex));
+      if (ddIndex >= 0) ddItems[ddIndex].el.scrollIntoView({ block: 'nearest' });
+    }
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#mapSearch') && !e.target.closest('#searchDD')) dd.classList.add('hidden');
+    });
+
+    // ═══════════ ACCESO RÁPIDO: DEPARTAMENTOS DEL PERÚ 🇵🇪 ═══════════
+    const PERU_DEPTS = [
+      ['Amazonas', -6.23, -77.87, 8], ['Áncash', -9.53, -77.53, 8], ['Apurímac', -14.05, -73.09, 9],
+      ['Arequipa', -16.40, -71.54, 8], ['Ayacucho', -13.16, -74.22, 8], ['Cajamarca', -7.16, -78.51, 8],
+      ['Callao', -12.05, -77.13, 12], ['Cusco', -13.53, -71.97, 8], ['Huancavelica', -12.79, -74.98, 9],
+      ['Huánuco', -9.93, -76.24, 8], ['Ica', -14.07, -75.73, 9], ['Junín', -11.16, -75.99, 8],
+      ['La Libertad', -8.11, -79.03, 8], ['Lambayeque', -6.70, -79.91, 9], ['Lima', -12.05, -77.04, 9],
+      ['Loreto', -4.37, -74.55, 6], ['Madre de Dios', -12.59, -70.19, 7], ['Moquegua', -17.19, -70.94, 9],
+      ['Pasco', -10.68, -76.26, 9], ['Piura', -5.19, -80.63, 8], ['Puno', -15.84, -70.02, 8],
+      ['San Martín', -6.51, -76.37, 8], ['Tacna', -18.01, -70.25, 9], ['Tumbes', -3.57, -80.45, 10],
+      ['Ucayali', -8.38, -74.55, 7],
+    ];
+    const deptSelect = document.getElementById('deptSelect');
+    PERU_DEPTS.forEach(([name], i) => {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = '📍 ' + name;
+      deptSelect.appendChild(opt);
+    });
+    deptSelect.addEventListener('change', () => {
+      if (deptSelect.value === '') return;
+      const [name, lat, lon, zoom] = PERU_DEPTS[+deptSelect.value];
+      map.flyTo([lat, lon], zoom, { duration: 1.4 });
+      if (tempClickMarker) map.removeLayer(tempClickMarker);
+      tempClickMarker = L.marker([lat, lon], { icon: markerIcon('🇵🇪') }).addTo(map);
+      loadClimate(lat, lon, name + ', Perú');
+      deptSelect.value = '';
+    });
+
+    // ── Geolocalización GPS ──
+    document.getElementById('btnGeoloc').addEventListener('click', () => {
+      if (!navigator.geolocation) { alert('Tu navegador no soporta geolocalización.'); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          map.flyTo([lat, lon], 13, { duration: 1.4 });
+          if (tempClickMarker) map.removeLayer(tempClickMarker);
+          tempClickMarker = L.marker([lat, lon], { icon: markerIcon('🛰️') }).addTo(map);
+          loadClimate(lat, lon, 'Mi ubicación (GPS)');
+        },
+        () => alert('No se pudo obtener tu ubicación. Revisa los permisos.')
+      );
+    });
+
+    // ═══════════ CLIMA DE UN PUNTO (con auto-refresco) ═══════════
+    let liveTimer = null;
+    function closePanel() {
+      document.getElementById('climatePanel').classList.add('hidden');
+      if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    }
+
+    async function loadClimate(lat, lon, name, silent) {
+      const panel = document.getElementById('climatePanel');
+      panel.classList.remove('hidden');
+      if (!silent) {
+        document.getElementById('cpName').textContent = name || 'Punto seleccionado';
+        document.getElementById('cpCoords').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        document.getElementById('cpLoading').classList.remove('hidden');
+        document.getElementById('cpData').classList.add('hidden');
+      }
+      lastClick = { lat, lon, name };
+
+      // auto-refresco cada 60 s mientras el panel está abierto
+      if (liveTimer) clearInterval(liveTimer);
+      liveTimer = setInterval(() => loadClimate(lat, lon, name, true), 60000);
+
+      try {
+        const params = new URLSearchParams({
+          latitude: lat, longitude: lon,
+          current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
+          daily: 'precipitation_sum,uv_index_max,temperature_2m_min',
+          forecast_days: 7, timezone: 'auto',
+        });
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
+        const data = await res.json();
+        const cur = data.current;
+        const [desc, icon] = WMO_MAP[cur.weather_code] || ['—', '❔'];
+        const rain7 = data.daily.precipitation_sum.reduce((a, b) => a + (b || 0), 0);
+        const uvMax = Math.max(...data.daily.uv_index_max.map((v) => v || 0));
+        const minT = Math.min(...data.daily.temperature_2m_min);
+
+        document.getElementById('cpIcon').textContent = icon;
+        document.getElementById('cpTemp').textContent = cur.temperature_2m.toFixed(1) + '°C';
+        document.getElementById('cpDesc').textContent = desc;
+        document.getElementById('cpHum').textContent = cur.relative_humidity_2m + '%';
+        document.getElementById('cpWind').textContent = cur.wind_speed_10m.toFixed(0) + ' km/h';
+        document.getElementById('cpRain').textContent = rain7.toFixed(1) + ' mm';
+        document.getElementById('cpUV').textContent = uvMax.toFixed(1);
+        document.getElementById('cpRefreshed').textContent =
+          '↻ auto-refresco · ' + new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        const alertBox = document.getElementById('cpAlert');
+        if (minT <= 0) { alertBox.textContent = `❄️ Helada prevista: mínima de ${minT.toFixed(1)}°C esta semana`; alertBox.classList.remove('hidden'); }
+        else if (rain7 > 90) { alertBox.textContent = `🌊 Lluvia excesiva: ${rain7.toFixed(0)} mm en 7 días`; alertBox.classList.remove('hidden'); }
+        else alertBox.classList.add('hidden');
+
+        document.getElementById('cpSave').style.display = canEdit ? 'block' : 'none';
+        document.getElementById('cpLoading').classList.add('hidden');
+        document.getElementById('cpData').classList.remove('hidden');
+        stampUpdate();
+      } catch (e) {
+        if (!silent) document.getElementById('cpLoading').textContent = '⚠️ Error consultando el clima.';
+      }
+    }
+
+    // ── Clic en el mapa ──
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      if (tempClickMarker) map.removeLayer(tempClickMarker);
+      tempClickMarker = L.marker([lat, lng], { icon: markerIcon('📍') }).addTo(map);
+      loadClimate(lat, lng, 'Punto seleccionado');
+    });
+
+    // ── Guardar parcela ──
+    document.getElementById('cpSave').addEventListener('click', () => {
+      if (!canEdit || !lastClick) return;
+      const name = prompt('Nombre de la parcela:', lastClick.name === 'Punto seleccionado' ? '' : lastClick.name);
+      if (!name) return;
+      const crop = prompt('Cultivo (ej: 🥔 Papa, 🌽 Maíz, ☕ Café):', '🌾 Quinua') || '🌾 Cultivo';
+      const parcels = getParcels();
+      parcels.push({ id: Date.now(), name, crop, lat: lastClick.lat, lon: lastClick.lon });
+      saveParcels(parcels);
+      if (tempClickMarker) { map.removeLayer(tempClickMarker); tempClickMarker = null; }
+      renderParcels(); refreshParcelTemps();
+    });
+
+    // ═══════════ ARRANQUE + CICLOS EN TIEMPO REAL ═══════════
+    renderParcels();
+    refreshParcelTemps();
+    refreshRadar();
+    setInterval(refreshParcelTemps, 5 * 60 * 1000); // temperaturas cada 5 min
+    setInterval(refreshRadar, 5 * 60 * 1000);       // radar cada 5 min
+    stampUpdate();
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3876a2c9e700cdd',t:'MTc4ODk2OTcxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

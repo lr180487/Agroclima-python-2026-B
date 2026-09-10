@@ -1,0 +1,108 @@
+PROYECTO_AGRICULTURA/
+│
+├── backend/
+│   │
+│   ├── .venv/                         # GENERADO POR uv
+│   │
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── database.py
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── security.py
+│   │   │
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── auth.py
+│   │   │   ├── users.py
+│   │   │   ├── parcels.py
+│   │   │   └── history.py
+│   │   │
+│   │   ├── core/
+│   │   │   ├── __init__.py
+│   │   │   ├── config.py
+│   │   │   └── dependencies.py
+│   │   │
+│   │   └── services/
+│   │       ├── __init__.py
+│   │       ├── auth_service.py
+│   │       ├── parcel_service.py
+│   │       └── history_service.py
+│   │
+│   ├── .env
+│   ├── .env.example
+│   ├── .gitignore
+│   ├── pyproject.toml
+│   └── uv.lock                        # GENERADO POR uv
+│
+└── frontend/
+    │
+    ├── index.html
+    ├── landing.html
+    ├── login.html
+    ├── register.html
+    ├── dashboard.html
+    ├── parcels.html
+    ├── history.html
+    ├── profile.html
+    ├── users.html
+    │
+    ├── css/
+    │   └── app.css
+    │
+    └── js/
+        ├── api-config.js
+        ├── api.js
+        ├── auth.js
+        ├── dashboard.js
+        ├── parcels.js
+        ├── history.js
+        └── app.js
+        
+        
+  //
+                           ┌─────────────────────────┐
+                         │       Navegador         │
+                         └────────────┬────────────┘
+                                      │
+                         http://127.0.0.1:8000
+                                      │
+                    ┌─────────────────┴─────────────────┐
+                    │                                   │
+                    ▼                                   ▼
+                 FRONTEND                              API
+                    │                                   │
+              ┌─────┴─────┐                    ┌───────┴───────┐
+              │            │                    │               │
+              ▼            ▼                    ▼               ▼
+          index.html  landing.html          /api/auth       /api/parcels
+              │                               │               │
+              ▼                               ▼               ▼
+       login/dashboard                  JWT + RBAC       PostgreSQL
+       mapa/config                      Google OAuth      / SQLite
+       notificaciones
+       
+       
+       
+  // 
+                           ┌─────────────────────────┐
+                         │       Navegador         │
+                         └────────────┬────────────┘
+                                      │
+                         http://127.0.0.1:8000
+                                      │
+                    ┌─────────────────┴─────────────────┐
+                    │                                   │
+                    ▼                                   ▼
+                 FRONTEND                              API
+                    │                                   │
+              ┌─────┴─────┐                    ┌───────┴───────┐
+              │            │                    │               │
+              ▼            ▼                    ▼               ▼
+          index.html  landing.html          /api/auth       /api/parcels
+              │                               │               │
+              ▼                               ▼               ▼
+       login/dashboard                  JWT + RBAC       PostgreSQL
+       mapa/config                      Google OAuth      / SQLite
+       notificaciones

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroClima · Notificaciones por Gmail</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Identity Services (OAuth 2.0 para Gmail API) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { agro: {50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d'} },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    .toggle { position: relative; width: 44px; height: 24px; appearance: none; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background .2s; outline: none; flex: none; }
+    .toggle:checked { background: #16a34a; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+    .toggle:checked::after { left: 23px; }
+    .spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: sp .7s linear infinite; display: inline-block; vertical-align: -3px; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+  </style>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="theme.js"></script>
+</head>
+<body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ═══════ NAVBAR ═══════ -->
+  <header class="bg-gradient-to-r from-agro-800 via-agro-700 to-emerald-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <a href="landing.html" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
+      </a>
+      <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
+        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="mapa.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🗺️ Mapa</a>
+        <a href="notificaciones.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">📧 Notificaciones</a>
+        <a href="api.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🔌 API</a>
+        <a href="estado.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📡 Estado</a>
+        <a href="config.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">⚙️ Configuración</a>
+      </nav>
+      <div id="userBadge"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+    <div class="mb-6">
+      <h1 class="text-2xl font-black text-slate-900">📧 Notificaciones por correo · Gmail API</h1>
+      <p class="text-sm text-slate-400 mt-1">Envía alertas meteorológicas del motor analítico directamente al correo de tu equipo.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- ═══════ COLUMNA IZQUIERDA: CONEXIÓN + CONFIG ═══════ -->
+      <div class="space-y-6">
+
+        <!-- Conexión Gmail API -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg flex items-center gap-2">
+              <svg class="w-6 h-6" viewBox="0 0 24 24"><path fill="#EA4335" d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+              Conexión con Gmail
+            </h2>
+            <span id="connBadge" class="px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">● Modo demo</span>
+          </div>
+
+          <div class="p-4 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-800 leading-relaxed mb-4">
+            <p class="font-black mb-1">ℹ️ ¿Cómo funciona?</p>
+            <p><strong>Modo real:</strong> pega tu <strong>Client ID</strong> de Google Cloud (con la Gmail API habilitada y este origen autorizado), pulsa <em>Conectar</em>, autoriza el permiso <code class="bg-blue-100 px-1 rounded">gmail.send</code> y los correos saldrán desde tu cuenta.</p>
+            <p class="mt-1"><strong>Modo demo:</strong> sin Client ID, los envíos se simulan y quedan registrados en la bandeja de salida con vista previa del correo.</p>
+          </div>
+
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Google Client ID (OAuth 2.0)</label>
+          <div class="flex gap-2">
+            <input id="clientId" type="text" placeholder="123456789-xxxx.apps.googleusercontent.com"
+              class="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            <button id="btnConnect" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold transition active:scale-95 whitespace-nowrap">🔗 Conectar</button>
+          </div>
+          <p id="connMsg" class="text-xs mt-2 hidden"></p>
+        </section>
+
+        <!-- Configuración de alertas -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-4">🔔 Qué alertas enviar</h2>
+          <div class="space-y-2.5">
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">❄️ Heladas <span class="block text-[11px] font-normal text-slate-400">Mínimas bajo el umbral configurado</span></span>
+              <input type="checkbox" class="toggle" id="tHelada" checked />
+            </label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">🔥 Olas de calor <span class="block text-[11px] font-normal text-slate-400">Máximas sobre el umbral</span></span>
+              <input type="checkbox" class="toggle" id="tCalor" checked />
+            </label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">🌧️ Lluvia excesiva / tormentas <span class="block text-[11px] font-normal text-slate-400">Anegamiento y tormentas eléctricas</span></span>
+              <input type="checkbox" class="toggle" id="tLluvia" checked />
+            </label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">💨 Vientos fuertes <span class="block text-[11px] font-normal text-slate-400">Ráfagas peligrosas para cultivos</span></span>
+              <input type="checkbox" class="toggle" id="tViento" checked />
+            </label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">☀️ UV extremo <span class="block text-[11px] font-normal text-slate-400">Índice UV ≥ 11</span></span>
+              <input type="checkbox" class="toggle" id="tUV" />
+            </label>
+            <label class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+              <span class="text-sm font-bold">📋 Resumen diario <span class="block text-[11px] font-normal text-slate-400">Aunque no haya alertas</span></span>
+              <input type="checkbox" class="toggle" id="tResumen" checked />
+            </label>
+          </div>
+
+          <div class="grid sm:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Frecuencia</label>
+              <select id="frequency" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                <option value="inmediato">⚡ Inmediato (al detectar alerta)</option>
+                <option value="diario">🌅 Diario (6:00 am)</option>
+                <option value="semanal">📅 Semanal (lunes)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Nombre del remitente</label>
+              <input id="senderName" type="text" value="AgroClima Alertas"
+                class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+          </div>
+
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 mt-4">Destinatarios (separados por coma)</label>
+          <input id="recipients" type="text" placeholder="ingeniero@fundo.pe, capataz@fundo.pe"
+            class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-agro-500" />
+
+          <button id="btnSaveCfg" class="mt-4 w-full px-5 py-3 rounded-xl bg-agro-600 hover:bg-agro-700 text-white font-black shadow-md shadow-agro-600/25 transition active:scale-95">
+            💾 Guardar configuración
+          </button>
+          <p id="saveOk" class="text-center text-xs font-bold text-agro-700 mt-2 opacity-0 transition-opacity">✅ Configuración guardada</p>
+        </section>
+      </div>
+
+      <!-- ═══════ COLUMNA DERECHA: ENVÍO DE PRUEBA + BANDEJA ═══════ -->
+      <div class="space-y-6">
+
+        <!-- Envío de prueba con datos reales -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-1">🚀 Enviar notificación ahora</h2>
+          <p class="text-xs text-slate-400 mb-4">Genera el reporte con <strong>datos climáticos reales</strong> (Open-Meteo) de la parcela elegida y lo envía a los destinatarios.</p>
+
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Parcela / ubicación</label>
+          <select id="locSelect" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500 mb-4">
+            <option value="-12.0651,-75.2049,Valle del Mantaro, Junín">Valle del Mantaro — Junín</option>
+            <option value="-14.0678,-75.7286,Viñedo Ica Sur, Ica">Viñedo Ica Sur — Ica</option>
+            <option value="-11.0574,-75.3288,Cafetal Chanchamayo, Junín">Cafetal Chanchamayo — Junín</option>
+            <option value="-13.5320,-71.9675,Parcela Cusco, Cusco">Parcela Cusco — Cusco</option>
+            <option value="-5.1945,-80.6328,Campo Piura, Piura">Campo Piura — Piura</option>
+          </select>
+
+          <button id="btnSendNow" class="w-full px-5 py-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-black shadow-lg shadow-red-500/25 transition active:scale-95">
+            📧 Generar y enviar reporte
+          </button>
+          <div id="sendResult" class="hidden mt-3 p-3.5 rounded-xl text-xs font-semibold"></div>
+        </section>
+
+        <!-- Vista previa -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="font-bold text-lg">👁️ Vista previa del correo</h2>
+            <button id="btnPreview" class="text-xs font-bold text-agro-600 hover:underline">↻ Generar vista previa</button>
+          </div>
+          <div id="previewBox" class="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 min-h-[120px] flex items-center justify-center text-sm text-slate-400">
+            Pulsa "Generar vista previa" para ver el correo con datos reales
+          </div>
+        </section>
+
+        <!-- Bandeja de salida -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-bold text-lg">📤 Bandeja de salida</h2>
+            <button id="btnClearOutbox" class="text-xs font-bold text-red-500 hover:underline">Limpiar</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="text-left text-[10px] uppercase tracking-wide text-slate-400 border-b border-slate-200">
+                  <th class="py-2 pr-3">Fecha</th><th class="py-2 pr-3">Para</th><th class="py-2 pr-3">Asunto</th><th class="py-2 pr-3">Vía</th><th class="py-2">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="outboxBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <p id="outboxEmpty" class="text-sm text-slate-400 text-center py-5">Aún no se han enviado notificaciones.</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">
+    📧 AgroClima Notificaciones · Gmail API (scope <code>gmail.send</code>) · OAuth 2.0 Google Identity Services
+  </footer>
+
+  <script src="gas-client.js"></script>
+  <script src="auth.js"></script>
+  <script src="notify.js"></script>
+  <script>
+    'use strict';
+    const session = requireAuth('config.profile');
+    renderUserBadge();
+
+    const WMO_N = {0:'Despejado',1:'Mayormente despejado',2:'Parcialmente nublado',3:'Nublado',45:'Niebla',51:'Llovizna',61:'Lluvia ligera',63:'Lluvia',65:'Lluvia fuerte',80:'Chubascos',95:'Tormenta'};
+
+    // ─── Cargar configuración guardada ───
+    const cfg = getNotifyCfg();
+    document.getElementById('clientId').value = cfg.clientId || '';
+    document.getElementById('recipients').value = cfg.recipients || '';
+    document.getElementById('senderName').value = cfg.senderName || 'AgroClima Alertas';
+    document.getElementById('frequency').value = cfg.frequency || 'inmediato';
+    const typeMap = { helada: 'tHelada', calor: 'tCalor', lluvia: 'tLluvia', viento: 'tViento', uv: 'tUV', resumen: 'tResumen' };
+    Object.entries(typeMap).forEach(([k, id]) => {
+      if (cfg.types && k in cfg.types) document.getElementById(id).checked = !!cfg.types[k];
+    });
+
+    // ─── Guardar configuración ───
+    document.getElementById('btnSaveCfg').addEventListener('click', () => {
+      const newCfg = {
+        clientId: document.getElementById('clientId').value.trim(),
+        recipients: document.getElementById('recipients').value.trim(),
+        senderName: document.getElementById('senderName').value.trim() || 'AgroClima Alertas',
+        frequency: document.getElementById('frequency').value,
+        types: Object.fromEntries(Object.entries(typeMap).map(([k, id]) => [k, document.getElementById(id).checked])),
+      };
+      saveNotifyCfg(newCfg);
+      const ok = document.getElementById('saveOk');
+      ok.style.opacity = 1; setTimeout(() => (ok.style.opacity = 0), 2200);
+    });
+
+    // ─── Conectar con Gmail (OAuth) ───
+    document.getElementById('btnConnect').addEventListener('click', async () => {
+      const cid = document.getElementById('clientId').value.trim();
+      const msg = document.getElementById('connMsg');
+      msg.classList.remove('hidden');
+      if (!cid) {
+        msg.className = 'text-xs mt-2 font-semibold text-amber-600';
+        msg.textContent = '⚠️ Sin Client ID seguirás en modo demo (envíos simulados). Crea uno en console.cloud.google.com → APIs → Credenciales.';
+        return;
+      }
+      try {
+        msg.className = 'text-xs mt-2 font-semibold text-slate-500';
+        msg.textContent = '⏳ Abriendo ventana de autorización de Google…';
+        await gmailConnect(cid);
+        document.getElementById('connBadge').className = 'px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold';
+        document.getElementById('connBadge').textContent = '● Gmail conectado';
+        msg.className = 'text-xs mt-2 font-semibold text-green-600';
+        msg.textContent = '✅ Autorizado. Los correos se enviarán desde tu cuenta de Gmail real.';
+      } catch (e) {
+        msg.className = 'text-xs mt-2 font-semibold text-red-600';
+        msg.textContent = '❌ ' + e.message;
+      }
+    });
+
+    // ─── Generar reporte con datos reales ───
+    async function buildReport() {
+      const [lat, lon, ...nameParts] = document.getElementById('locSelect').value.split(',');
+      const locName = nameParts.join(',').trim();
+      const params = new URLSearchParams({
+        latitude: lat, longitude: lon,
+        current: 'temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code',
+        daily: 'temperature_2m_min,temperature_2m_max,precipitation_sum,wind_speed_10m_max,uv_index_max,weather_code',
+        forecast_days: 7, timezone: 'auto',
+      });
+      const res = await fetch('https://api.open-meteo.com/v1/forecast?' + params);
+      const data = await res.json();
+      const cur = data.current, d = data.daily;
+      const rain7 = d.precipitation_sum.reduce((a, b) => a + (b || 0), 0);
+      const minT = Math.min(...d.temperature_2m_min);
+      const maxT = Math.max(...d.temperature_2m_max);
+      const windMax = Math.max(...d.wind_speed_10m_max);
+      const uvMax = Math.max(...d.uv_index_max.map((v) => v || 0));
+      const storms = d.weather_code.filter((c) => c >= 95).length;
+
+      const t = getNotifyCfg().types || {};
+      const alerts = [];
+      if (t.helada !== false && minT <= 2) alerts.push(['danger', '❄️ Riesgo de helada', `Mínima de ${minT.toFixed(1)}°C prevista esta semana.`]);
+      if (t.calor !== false && maxT >= 32) alerts.push(['warning', '🔥 Calor elevado', `Máxima de ${maxT.toFixed(1)}°C prevista.`]);
+      if (t.lluvia !== false && rain7 > 90) alerts.push(['danger', '🌊 Lluvia excesiva', `${rain7.toFixed(0)} mm acumulados en 7 días.`]);
+      if (t.lluvia !== false && storms > 0) alerts.push(['danger', '⛈️ Tormentas eléctricas', `${storms} día(s) con tormenta prevista.`]);
+      if (t.viento !== false && windMax > 40) alerts.push(['warning', '💨 Vientos fuertes', `Ráfagas de hasta ${windMax.toFixed(0)} km/h.`]);
+      if (t.uv && uvMax >= 11) alerts.push(['warning', '☀️ UV extremo', `Índice UV máximo de ${uvMax.toFixed(0)}.`]);
+
+      const subject = alerts.length
+        ? `🚨 AgroClima: ${alerts.length} alerta(s) en ${locName}`
+        : `🌱 AgroClima: reporte diario de ${locName} — sin alertas`;
+
+      const html = emailTemplate({
+        title: alerts.length ? `${alerts.length} alerta(s) meteorológica(s)` : 'Reporte agroclimático diario',
+        location: locName,
+        alerts,
+        metrics: [
+          ['Temp', cur.temperature_2m.toFixed(1) + '°C'],
+          ['Humedad', cur.relative_humidity_2m + '%'],
+          ['Lluvia 7d', rain7.toFixed(0) + ' mm'],
+          ['Viento', cur.wind_speed_10m.toFixed(0) + ' km/h'],
+        ],
+        footerNote: `Estado actual: ${WMO_N[cur.weather_code] || '—'} · Frecuencia configurada: ${getNotifyCfg().frequency}`,
+      });
+      return { subject, html, alerts };
+    }
+
+    // ─── Vista previa ───
+    document.getElementById('btnPreview').addEventListener('click', async () => {
+      const box = document.getElementById('previewBox');
+      box.innerHTML = '<p class="text-sm text-slate-400 p-6">⏳ Generando con datos reales…</p>';
+      try {
+        const { html } = await buildReport();
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:480px;border:0;background:#f1f5f9';
+        iframe.setAttribute('sandbox', '');
+        iframe.srcdoc = html;
+        box.innerHTML = '';
+        box.appendChild(iframe);
+      } catch (e) { box.innerHTML = '<p class="text-sm text-red-500 p-6">⚠️ ' + e.message + '</p>'; }
+    });
+
+    // ─── Enviar ahora ───
+    document.getElementById('btnSendNow').addEventListener('click', async () => {
+      const btn = document.getElementById('btnSendNow');
+      const result = document.getElementById('sendResult');
+      const to = document.getElementById('recipients').value.trim();
+      result.classList.remove('hidden');
+      if (!to) {
+        result.className = 'mt-3 p-3.5 rounded-xl text-xs font-semibold bg-amber-50 border border-amber-200 text-amber-700';
+        result.textContent = '⚠️ Ingresa al menos un destinatario y guarda la configuración.';
+        return;
+      }
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spin"></span> Generando reporte y enviando…';
+      try {
+        const { subject, html, alerts } = await buildReport();
+        const res = await sendNotification({ to, subject, html, senderName: document.getElementById('senderName').value.trim() });
+        if (res.ok) {
+          result.className = 'mt-3 p-3.5 rounded-xl text-xs font-semibold bg-green-50 border border-green-200 text-green-700';
+          result.innerHTML = res.mode === 'gmail'
+            ? `✅ <strong>Enviado con Gmail API</strong> (id: ${res.id}) a: ${to} · ${alerts.length} alerta(s) incluida(s).`
+            : `✅ <strong>Enviado en modo demo</strong> a: ${to} · ${alerts.length} alerta(s). Conecta un Client ID para envíos reales por Gmail. Revisa la bandeja de salida ↓`;
+        } else {
+          result.className = 'mt-3 p-3.5 rounded-xl text-xs font-semibold bg-red-50 border border-red-200 text-red-700';
+          result.textContent = '❌ Error de la Gmail API: ' + res.error;
+        }
+        renderOutbox();
+      } catch (e) {
+        result.className = 'mt-3 p-3.5 rounded-xl text-xs font-semibold bg-red-50 border border-red-200 text-red-700';
+        result.textContent = '❌ ' + e.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📧 Generar y enviar reporte';
+      }
+    });
+
+    // ─── Bandeja de salida ───
+    function renderOutbox() {
+      const box = getOutbox();
+      const body = document.getElementById('outboxBody');
+      const empty = document.getElementById('outboxEmpty');
+      body.innerHTML = '';
+      if (!box.length) { empty.classList.remove('hidden'); return; }
+      empty.classList.add('hidden');
+      box.forEach((m, i) => {
+        const ok = m.status === 'enviado';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2.5 pr-3 whitespace-nowrap text-slate-500">${m.fecha}</td>
+          <td class="py-2.5 pr-3 max-w-[130px] truncate" title="${m.to}">${m.to}</td>
+          <td class="py-2.5 pr-3 max-w-[180px] truncate" title="${m.subject}">${m.subject}</td>
+          <td class="py-2.5 pr-3 whitespace-nowrap">${m.mode === 'Gmail API' ? '📮 Gmail API' : '🧪 Demo'}</td>
+          <td class="py-2.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-black ${ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${ok ? '✓ Enviado' : '✗ ' + m.status}</span>
+          ${m.previewHtml ? `<button data-view="${i}" class="ml-1.5 text-agro-600 font-bold hover:underline">ver</button>` : ''}</td>`;
+        body.appendChild(tr);
+      });
+      body.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+        const m = getOutbox()[+b.dataset.view];
+        const box2 = document.getElementById('previewBox');
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%;height:480px;border:0;background:#f1f5f9';
+        iframe.setAttribute('sandbox', '');
+        iframe.srcdoc = m.previewHtml;
+        box2.innerHTML = '';
+        box2.appendChild(iframe);
+        box2.scrollIntoView({ behavior: 'smooth' });
+      }));
+    }
+    document.getElementById('btnClearOutbox').addEventListener('click', () => {
+      localStorage.removeItem('agroclima_outbox');
+      renderOutbox();
+    });
+    renderOutbox();
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3876abe3a440cdd',t:'MTc4ODk2OTc0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

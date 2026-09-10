@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroClima · Configuración</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { agro: {50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d'} },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'] },
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    .toggle { position: relative; width: 44px; height: 24px; appearance: none; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background .2s; outline: none; flex: none; }
+    .toggle:checked { background: #16a34a; }
+    .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: left .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+    .toggle:checked::after { left: 23px; }
+  </style>
+  <link rel="stylesheet" href="theme.css" />
+  <script src="theme.js"></script>
+</head>
+<body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ═══════ NAVBAR ═══════ -->
+  <header class="bg-gradient-to-r from-agro-800 via-agro-700 to-emerald-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <a href="landing.html" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
+      </a>
+      <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
+        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="mapa.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🗺️ Mapa</a>
+        <a href="notificaciones.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📧 Notificaciones</a>
+        <a href="api.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🔌 API</a>
+        <a href="estado.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📡 Estado</a>
+        <a href="config.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">⚙️ Configuración</a>
+      </nav>
+      <div id="userBadge"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+    <div class="mb-8">
+      <h1 class="text-2xl font-black text-slate-900">⚙️ Configuración</h1>
+      <p class="text-sm text-slate-400 mt-1">Las secciones visibles dependen de tu rol (RBAC): <span id="roleTag" class="font-bold"></span></p>
+    </div>
+
+    <div class="grid lg:grid-cols-[220px_1fr] gap-8">
+      <!-- ═══════ MENÚ LATERAL ═══════ -->
+      <aside class="space-y-1 text-sm font-semibold lg:sticky lg:top-24 self-start">
+        <button data-tab="perfil" class="tab-btn w-full text-left px-4 py-2.5 rounded-xl bg-agro-600 text-white transition">👤 Perfil</button>
+        <button data-tab="unidades" class="tab-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-white transition">📏 Unidades</button>
+        <button data-tab="alertas" id="tabAlertas" class="tab-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-white transition hidden">🚨 Umbrales de alertas</button>
+        <button data-tab="usuarios" id="tabUsuarios" class="tab-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-white transition hidden">👥 Usuarios y roles</button>
+        <button data-tab="sistema" id="tabSistema" class="tab-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-white transition hidden">🖥️ Sistema</button>
+      </aside>
+
+      <!-- ═══════ CONTENIDO ═══════ -->
+      <div class="space-y-6">
+
+        <!-- ─── PERFIL ─── -->
+        <section id="panel-perfil" class="panel bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-5">👤 Perfil de usuario</h2>
+          <div class="flex items-center gap-4 mb-6">
+            <div id="avatarBig" class="w-16 h-16 rounded-2xl bg-agro-600 text-white flex items-center justify-center text-xl font-black"></div>
+            <div>
+              <p id="profName" class="font-bold text-slate-800"></p>
+              <p id="profEmail" class="text-sm text-slate-400"></p>
+              <p id="profRole" class="text-xs font-bold mt-1"></p>
+            </div>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Nombre completo</label>
+              <input id="inpName" type="text" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Teléfono (alertas SMS)</label>
+              <input id="inpPhone" type="tel" placeholder="+51 999 999 999" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Ubicación por defecto</label>
+              <input id="inpDefaultLoc" type="text" placeholder="Ej: Huancayo, Perú" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+          </div>
+          <div class="mt-5 flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <div><p class="text-sm font-bold">Notificaciones por correo</p><p class="text-xs text-slate-400">Recibe el resumen agroclimático diario</p></div>
+            <input type="checkbox" class="toggle" id="tgEmail" checked />
+          </div>
+        </section>
+
+        <!-- ─── UNIDADES ─── -->
+        <section id="panel-unidades" class="panel hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-5">📏 Unidades de medida</h2>
+          <div class="space-y-4">
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Temperatura</label>
+                <select id="uTemp" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                  <option value="celsius">Celsius (°C)</option><option value="fahrenheit">Fahrenheit (°F)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Velocidad del viento</label>
+                <select id="uWind" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                  <option value="kmh">km/h</option><option value="ms">m/s</option><option value="mph">mph</option><option value="kn">nudos</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Precipitación</label>
+                <select id="uRain" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                  <option value="mm">Milímetros (mm)</option><option value="inch">Pulgadas (in)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Zona horaria</label>
+                <select id="uTz" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                  <option value="auto">Automática (del navegador)</option><option value="America/Lima">America/Lima (UTC-5)</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <div><p class="text-sm font-bold">Formato de 24 horas</p><p class="text-xs text-slate-400">Mostrar horas como 18:00 en lugar de 6:00 PM</p></div>
+              <input type="checkbox" class="toggle" id="tg24h" checked />
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── ALERTAS (agrónomo + admin) ─── -->
+        <section id="panel-alertas" class="panel hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-1">🚨 Umbrales de alertas del motor analítico</h2>
+          <p class="text-xs text-slate-400 mb-5">Requiere rol Agrónomo o Administrador · define cuándo se disparan las alertas.</p>
+          <div class="space-y-5">
+            <div>
+              <div class="flex justify-between text-sm mb-1"><label class="font-bold">❄️ Alerta de helada</label><span id="vFrost" class="font-mono text-agro-700 font-bold">2°C</span></div>
+              <input id="rFrost" type="range" min="-5" max="10" value="2" class="w-full accent-agro-600" />
+              <p class="text-xs text-slate-400">Se alerta cuando la mínima pronosticada baja de este valor.</p>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1"><label class="font-bold">🔥 Alerta de calor</label><span id="vHeat" class="font-mono text-agro-700 font-bold">34°C</span></div>
+              <input id="rHeat" type="range" min="25" max="45" value="34" class="w-full accent-agro-600" />
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1"><label class="font-bold">🌊 Anegamiento (lluvia 7 días)</label><span id="vFlood" class="font-mono text-agro-700 font-bold">90 mm</span></div>
+              <input id="rFlood" type="range" min="30" max="200" step="5" value="90" class="w-full accent-agro-600" />
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1"><label class="font-bold">💨 Vientos fuertes</label><span id="vWind" class="font-mono text-agro-700 font-bold">40 km/h</span></div>
+              <input id="rWind" type="range" min="20" max="90" step="5" value="40" class="w-full accent-agro-600" />
+            </div>
+            <div class="grid sm:grid-cols-3 gap-3 pt-2">
+              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold cursor-pointer"><input type="checkbox" class="toggle" checked /> Email</label>
+              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold cursor-pointer"><input type="checkbox" class="toggle" checked /> SMS</label>
+              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold cursor-pointer"><input type="checkbox" class="toggle" /> WhatsApp</label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── USUARIOS (solo admin) ─── -->
+        <section id="panel-usuarios" class="panel hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="font-bold text-lg">👥 Usuarios y roles (RBAC)</h2>
+            <button class="px-4 py-2 rounded-xl bg-agro-600 hover:bg-agro-700 text-white text-xs font-bold transition">+ Invitar usuario</button>
+          </div>
+          <p class="text-xs text-slate-400 mb-5">Solo Administrador · gestión de cuentas y permisos.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-200">
+                <th class="py-2 pr-4">Usuario</th><th class="py-2 pr-4">Rol</th><th class="py-2 pr-4">Proveedor</th><th class="py-2 pr-4">Estado</th><th class="py-2">Acciones</th>
+              </tr></thead>
+              <tbody id="usersTable" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <div class="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <p class="text-xs font-black text-slate-500 uppercase tracking-wide mb-3">Matriz de permisos por rol</p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead><tr class="text-left text-slate-400"><th class="py-1.5 pr-3">Permiso</th><th class="py-1.5 px-2 text-center">🛡️ Admin</th><th class="py-1.5 px-2 text-center">🔬 Agrónomo</th><th class="py-1.5 px-2 text-center">🌾 Agricultor</th></tr></thead>
+                <tbody id="permMatrix" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─── SISTEMA (solo admin) ─── -->
+        <section id="panel-sistema" class="panel hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-1">🖥️ Sistema e integraciones</h2>
+          <p class="text-xs text-slate-400 mb-5">Solo Administrador · fuentes de datos y base de datos.</p>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+              <div class="flex items-center gap-3"><span class="text-xl">🌦️</span><div><p class="text-sm font-bold">Open-Meteo API</p><p class="text-xs text-slate-400">api.open-meteo.com · sin API key</p></div></div>
+              <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">● Conectado</span>
+            </div>
+            <div class="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+              <div class="flex items-center gap-3"><span class="text-xl">📍</span><div><p class="text-sm font-bold">Nominatim (OpenStreetMap)</p><p class="text-xs text-slate-400">nominatim.openstreetmap.org</p></div></div>
+              <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">● Conectado</span>
+            </div>
+            <div class="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+              <div class="flex items-center gap-3"><span class="text-xl">🗄️</span><div><p class="text-sm font-bold">PostgreSQL (historial)</p><p class="text-xs text-slate-400 font-mono">postgres://agroclima-db:5432</p></div></div>
+              <span class="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">● Simulado (localStorage)</span>
+            </div>
+            <div class="flex items-center justify-between p-4 rounded-xl border border-slate-200">
+              <div class="flex items-center gap-3"><span class="text-xl">🗺️</span><div><p class="text-sm font-bold">Leaflet + OSM Tiles</p><p class="text-xs text-slate-400">tile.openstreetmap.org</p></div></div>
+              <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">● Conectado</span>
+            </div>
+          </div>
+
+          <!-- Backend Google Apps Script -->
+          <div class="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-sm font-bold">☁️ Backend Google Apps Script <span class="text-xs font-normal text-slate-400">(alternativo al FastAPI local)</span></p>
+              <span id="gasBadge" class="px-3 py-1 rounded-full bg-slate-200 text-slate-500 text-xs font-bold">● No configurado</span>
+            </div>
+            <p class="text-xs text-slate-400 mb-3">Pega la URL /exec de tu web app (ver <code class="bg-slate-200 px-1 rounded">backend-gas/README.md</code>). El login y los datos irán a Google: PostgreSQL vía JDBC o fallback a Sheets. Déjalo vacío para usar el backend local.</p>
+            <div class="flex gap-2">
+              <input id="gasUrl" type="url" placeholder="https://script.google.com/macros/s/AKfy.../exec"
+                class="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-agro-500" />
+              <button id="btnGasTest" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition active:scale-95 whitespace-nowrap">Probar y guardar</button>
+              <button id="btnGasClear" class="px-4 py-2.5 rounded-xl border-2 border-slate-300 text-slate-500 text-xs font-bold hover:bg-white transition">Quitar</button>
+            </div>
+            <p id="gasMsg" class="text-xs mt-2 hidden"></p>
+          </div>
+          <div class="mt-5 grid sm:grid-cols-2 gap-3">
+            <button onclick="if(confirm('¿Borrar historial de consultas?')){localStorage.removeItem('agroclima_history');alert('Historial eliminado ✅')}"
+              class="px-4 py-3 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition">🗑️ Vaciar historial de consultas</button>
+            <button onclick="alert('Backup exportado (demo) ✅')" class="px-4 py-3 rounded-xl border-2 border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition">💾 Exportar backup JSON</button>
+          </div>
+        </section>
+
+        <!-- Guardar -->
+        <div class="flex items-center justify-end gap-3">
+          <span id="saveMsg" class="text-sm text-agro-700 font-bold opacity-0 transition-opacity">✅ Cambios guardados</span>
+          <button id="btnSave" class="px-8 py-3 rounded-xl bg-agro-600 hover:bg-agro-700 text-white font-black shadow-lg shadow-agro-600/25 transition active:scale-95">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">🌱 AgroClima · Configuración protegida por RBAC</footer>
+
+  <script src="gas-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    'use strict';
+    const session = requireAuth('config.profile');
+    renderUserBadge();
+    const role = ROLES[session.role];
+
+    // ─── Mostrar secciones según permisos (RBAC) ───
+    document.getElementById('roleTag').textContent = `${role.icon} ${role.label}`;
+    if (hasPermission('config.alerts')) document.getElementById('tabAlertas').classList.remove('hidden');
+    if (hasPermission('config.users'))  document.getElementById('tabUsuarios').classList.remove('hidden');
+    if (hasPermission('config.system')) document.getElementById('tabSistema').classList.remove('hidden');
+
+    // ─── Perfil ───
+    document.getElementById('avatarBig').textContent = session.name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase();
+    document.getElementById('profName').textContent = session.name;
+    document.getElementById('profEmail').textContent = session.email + (session.provider !== 'password' ? ` · OAuth: ${session.provider}` : '');
+    document.getElementById('profRole').textContent = `${role.icon} ${role.label}`;
+    document.getElementById('inpName').value = session.name;
+
+    // ─── Tabs ───
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach((b) => b.className = 'tab-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-white transition' + (b.classList.contains('hidden') ? ' hidden' : ''));
+        btn.className = 'tab-btn w-full text-left px-4 py-2.5 rounded-xl bg-agro-600 text-white transition';
+        document.querySelectorAll('.panel').forEach((p) => p.classList.add('hidden'));
+        document.getElementById('panel-' + btn.dataset.tab).classList.remove('hidden');
+      });
+    });
+
+    // ─── Sliders de umbrales ───
+    [['rFrost','vFrost','°C'],['rHeat','vHeat','°C'],['rFlood','vFlood',' mm'],['rWind','vWind',' km/h']].forEach(([r,v,u]) => {
+      const range = document.getElementById(r);
+      range.addEventListener('input', () => document.getElementById(v).textContent = range.value + u);
+    });
+
+    // ─── Tabla de usuarios (solo admin la ve) ───
+    const roleBadge = { admin: 'bg-red-100 text-red-700', agronomo: 'bg-blue-100 text-blue-700', agricultor: 'bg-green-100 text-green-700' };
+    const usersTable = document.getElementById('usersTable');
+    if (usersTable) {
+      DEMO_USERS.forEach((u) => {
+        const r = ROLES[u.role];
+        usersTable.innerHTML += `
+          <tr>
+            <td class="py-3 pr-4"><p class="font-bold">${u.name}</p><p class="text-xs text-slate-400">${u.email}</p></td>
+            <td class="py-3 pr-4"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${roleBadge[u.role]}">${r.icon} ${r.label}</span></td>
+            <td class="py-3 pr-4 text-xs">🔑 Contraseña</td>
+            <td class="py-3 pr-4"><span class="text-xs font-bold text-green-600">● Activo</span></td>
+            <td class="py-3 text-xs"><button class="text-agro-600 font-bold hover:underline mr-3">Editar</button><button class="text-red-500 font-bold hover:underline">Suspender</button></td>
+          </tr>`;
+      });
+      // Matriz de permisos
+      const allPerms = [...new Set(Object.values(ROLES).flatMap((r) => r.permissions))].sort();
+      const matrix = document.getElementById('permMatrix');
+      allPerms.forEach((p) => {
+        matrix.innerHTML += `<tr>
+          <td class="py-1.5 pr-3 font-mono">${p}</td>
+          ${['admin','agronomo','agricultor'].map((rk) =>
+            `<td class="py-1.5 px-2 text-center">${ROLES[rk].permissions.includes(p) ? '✅' : '—'}</td>`).join('')}
+        </tr>`;
+      });
+    }
+
+    // ─── Backend GAS (solo visible para admin en Sistema) ───
+    const gasUrlInput = document.getElementById('gasUrl');
+    if (gasUrlInput) {
+      const gasBadge = document.getElementById('gasBadge');
+      const gasMsg = document.getElementById('gasMsg');
+      function paintGas(ok, text) {
+        gasBadge.className = 'px-3 py-1 rounded-full text-xs font-bold ' + (ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500');
+        gasBadge.textContent = ok ? '● Conectado' : '● No configurado';
+        if (text) { gasMsg.classList.remove('hidden'); gasMsg.className = 'text-xs mt-2 font-semibold ' + (ok ? 'text-green-600' : 'text-red-600'); gasMsg.textContent = text; }
+      }
+      gasUrlInput.value = getGasUrl();
+      if (gasEnabled()) paintGas(true);
+
+      document.getElementById('btnGasTest').addEventListener('click', async () => {
+        const url = gasUrlInput.value.trim();
+        if (!url) { paintGas(false, '⚠️ Ingresa la URL /exec del web app.'); return; }
+        gasMsg.classList.remove('hidden');
+        gasMsg.className = 'text-xs mt-2 font-semibold text-slate-500';
+        gasMsg.textContent = '⏳ Probando conexión con Google Apps Script…';
+        setGasUrl(url);
+        try {
+          const h = await gasHealth();
+          paintGas(true, `✅ Conectado · storage: ${h.storage} · OAuth: ${h.oauth_google}`);
+        } catch (e) {
+          setGasUrl('');
+          paintGas(false, '❌ No respondió: ' + e.message + ' (verifica el despliegue como "Cualquier persona")');
+        }
+      });
+      document.getElementById('btnGasClear').addEventListener('click', () => {
+        setGasUrl(''); gasUrlInput.value = '';
+        paintGas(false, 'Se usará el backend FastAPI local.');
+      });
+    }
+
+    // ─── Guardar (localStorage) ───
+    document.getElementById('btnSave').addEventListener('click', () => {
+      const prefs = {
+        phone: document.getElementById('inpPhone').value,
+        defaultLoc: document.getElementById('inpDefaultLoc').value,
+        emailNotif: document.getElementById('tgEmail').checked,
+        units: { temp: document.getElementById('uTemp').value, wind: document.getElementById('uWind').value, rain: document.getElementById('uRain').value, tz: document.getElementById('uTz').value, h24: document.getElementById('tg24h').checked },
+        thresholds: { frost: +document.getElementById('rFrost').value, heat: +document.getElementById('rHeat').value, flood: +document.getElementById('rFlood').value, wind: +document.getElementById('rWind').value },
+      };
+      localStorage.setItem('agroclima_prefs', JSON.stringify(prefs));
+      const msg = document.getElementById('saveMsg');
+      msg.style.opacity = 1;
+      setTimeout(() => (msg.style.opacity = 0), 2500);
+    });
+
+    // Cargar prefs guardadas
+    try {
+      const p = JSON.parse(localStorage.getItem('agroclima_prefs'));
+      if (p) {
+        document.getElementById('inpPhone').value = p.phone || '';
+        document.getElementById('inpDefaultLoc').value = p.defaultLoc || '';
+        document.getElementById('tgEmail').checked = !!p.emailNotif;
+        if (p.units) { document.getElementById('uTemp').value = p.units.temp; document.getElementById('uWind').value = p.units.wind; document.getElementById('uRain').value = p.units.rain; document.getElementById('uTz').value = p.units.tz; document.getElementById('tg24h').checked = !!p.units.h24; }
+        if (p.thresholds) {
+          [['rFrost','vFrost','frost','°C'],['rHeat','vHeat','heat','°C'],['rFlood','vFlood','flood',' mm'],['rWind','vWind','wind',' km/h']].forEach(([r,v,k,u]) => {
+            document.getElementById(r).value = p.thresholds[k];
+            document.getElementById(v).textContent = p.thresholds[k] + u;
+          });
+        }
+      }
+    } catch {}
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38767a21af30cdd',t:'MTc4ODk2OTYxNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

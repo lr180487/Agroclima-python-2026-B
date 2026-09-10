@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroClima · API para desarrolladores</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { agro: {50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d'} },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'], mono: ['ui-monospace','SFMono-Regular','Menlo','monospace'] },
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="theme.css" />
+  <script src="theme.js"></script>
+  <style>
+    .code-block { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 14px 16px; font-size: 12px; line-height: 1.6; overflow-x: auto; font-family: ui-monospace, Menlo, monospace; }
+    .code-block .g { color: #4ade80; } .code-block .y { color: #fbbf24; } .code-block .c { color: #64748b; }
+    .method-badge { font-size: 10px; font-weight: 900; padding: 3px 8px; border-radius: 6px; }
+    .m-get { background: #dbeafe; color: #1d4ed8; } .m-post { background: #dcfce7; color: #15803d; } .m-del { background: #fee2e2; color: #b91c1c; }
+  </style>
+</head>
+<body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ═══════ NAVBAR ═══════ -->
+  <header class="bg-gradient-to-r from-agro-800 via-agro-700 to-emerald-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <a href="landing.html" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
+      </a>
+      <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
+        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="mapa.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🗺️ Mapa</a>
+        <a href="api.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">🔌 API</a>
+        <a href="estado.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📡 Estado</a>
+        <a href="config.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">⚙️ Configuración</a>
+      </nav>
+      <div id="userBadge"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+    <div class="mb-8">
+      <h1 class="text-2xl font-black text-slate-900">🔌 API pública de AgroClima</h1>
+      <p class="text-sm text-slate-400 mt-1">Integra el motor analítico agroclimático en tus propios sistemas: apps móviles, ERPs agrícolas, bots o tableros externos. Documentación completa también en <a href="/docs" class="text-agro-600 font-bold hover:underline">/docs (Swagger)</a>.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- ═══════ COLUMNA IZQUIERDA: API KEYS + DOCS ═══════ -->
+      <div class="space-y-6">
+
+        <!-- API Keys -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="font-bold text-lg">🔑 Mis API keys</h2>
+            <button id="btnNewKey" class="px-4 py-2 rounded-xl bg-agro-600 hover:bg-agro-700 text-white text-xs font-bold transition active:scale-95">+ Generar clave</button>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">Para integraciones externas sin JWT: envía la clave en el header <code class="bg-slate-100 px-1 rounded">X-API-Key</code>. Máx. 10 claves.</p>
+          <div id="keysList" class="space-y-2"></div>
+          <p id="keysEmpty" class="text-sm text-slate-400 text-center py-4">Aún no tienes claves. Genera la primera.</p>
+          <p id="keysMsg" class="hidden text-xs font-semibold mt-2"></p>
+        </section>
+
+        <!-- Endpoints -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-4">📚 Endpoints principales</h2>
+          <div class="space-y-4 text-sm">
+            <div class="border border-slate-200 rounded-xl p-4">
+              <p class="flex items-center gap-2 mb-1"><span class="method-badge m-post">POST</span><code class="font-mono text-xs font-bold">/api/v1/analyze</code></p>
+              <p class="text-xs text-slate-500 mb-2">Motor analítico completo: índice 0–100, estado, alertas y recomendaciones.</p>
+              <div class="code-block"><span class="c"># Body JSON:</span>
+{ <span class="y">"lat"</span>: -13.31, <span class="y">"lon"</span>: -72.12, <span class="y">"crop"</span>: <span class="g">"maiz"</span> }</div>
+            </div>
+            <div class="border border-slate-200 rounded-xl p-4">
+              <p class="flex items-center gap-2 mb-1"><span class="method-badge m-get">GET</span><code class="font-mono text-xs font-bold">/api/v1/analyze?lat=&lon=&crop=</code></p>
+              <p class="text-xs text-slate-500">Variante GET del análisis, ideal para curl o pruebas rápidas.</p>
+            </div>
+            <div class="border border-slate-200 rounded-xl p-4">
+              <p class="flex items-center gap-2 mb-1"><span class="method-badge m-get">GET</span><code class="font-mono text-xs font-bold">/api/v1/crops</code></p>
+              <p class="text-xs text-slate-500">Catálogo público de cultivos y rangos agroclimáticos (sin autenticación).</p>
+            </div>
+            <div class="border border-slate-200 rounded-xl p-4">
+              <p class="flex items-center gap-2 mb-1"><span class="method-badge m-get">GET</span><code class="font-mono text-xs font-bold">/api/parcels · /api/history</code></p>
+              <p class="text-xs text-slate-500">Tus datos (JWT). Ver todos los endpoints en <a href="/docs" class="text-agro-600 font-bold hover:underline">/docs</a>.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Ejemplo curl -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-3">💻 Ejemplo de integración</h2>
+          <div class="code-block"><span class="c"># Con API key (integraciones externas):</span>
+curl -X POST <span id="curlBase" class="g">https://tu-dominio</span>/api/v1/analyze \
+  -H <span class="y">"Content-Type: application/json"</span> \
+  -H <span class="y">"X-API-Key: agk_tu_clave_aqui"</span> \
+  -d <span class="y">'{"lat":-13.31,"lon":-72.12,"crop":"maiz"}'</span>
+
+<span class="c"># El mismo motor vía backend Google Apps Script:</span>
+curl -X POST <span class="g">https://script.google.com/macros/s/…/exec</span> \
+  -H <span class="y">"Content-Type: text/plain"</span> \
+  -d <span class="y">'{"action":"weather/analyze","payload":{"lat":-13.31,"lon":-72.12,"crop":"maiz"}}'</span></div>
+        </section>
+      </div>
+
+      <!-- ═══════ COLUMNA DERECHA: CONSOLA EN VIVO ═══════ -->
+      <div class="space-y-6">
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-1">🧪 Consola de pruebas en vivo</h2>
+          <p class="text-xs text-slate-400 mb-4">Ejecuta <code class="bg-slate-100 px-1 rounded">POST /api/v1/analyze</code> contra el backend real con tu sesión actual.</p>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Latitud</label>
+              <input id="tLat" type="number" step="0.0001" value="-13.3160"
+                class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Longitud</label>
+              <input id="tLon" type="number" step="0.0001" value="-72.1240"
+                class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-agro-500" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Cultivo</label>
+              <select id="tCrop" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                <option value="papa">🥔 papa</option><option value="maiz" selected>🌽 maiz</option>
+                <option value="arroz">🍚 arroz</option><option value="cafe">☕ cafe</option>
+                <option value="quinua">🌾 quinua</option><option value="tomate">🍅 tomate</option>
+                <option value="palta">🥑 palta</option><option value="uva">🍇 uva</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Autenticación</label>
+              <select id="tAuth" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-agro-500">
+                <option value="jwt">JWT (mi sesión)</option>
+                <option value="apikey">X-API-Key (elegir abajo)</option>
+              </select>
+            </div>
+          </div>
+          <div id="apiKeyPickWrap" class="hidden mb-4">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">API key a usar</label>
+            <select id="tApiKey" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-agro-500"></select>
+          </div>
+          <button id="btnRun" class="w-full px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-black transition active:scale-95">▶ Ejecutar petición</button>
+
+          <div class="mt-4">
+            <div class="flex items-center justify-between mb-1.5">
+              <p class="text-xs font-bold text-slate-500 uppercase tracking-wide">Respuesta</p>
+              <span id="respMeta" class="text-[11px] font-mono text-slate-400">—</span>
+            </div>
+            <pre id="respBox" class="code-block max-h-[420px] overflow-y-auto whitespace-pre-wrap">// La respuesta JSON aparecerá aquí…</pre>
+          </div>
+        </section>
+
+        <!-- Resumen visual del resultado -->
+        <section id="visualBox" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 class="font-bold text-lg mb-4">📊 Resultado interpretado</h2>
+          <div class="flex items-center gap-5">
+            <div class="text-center">
+              <p id="vScore" class="text-5xl font-black">--</p>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1">Índice / 100</p>
+            </div>
+            <div class="flex-1 space-y-1.5 text-sm">
+              <p id="vStatus" class="font-black">--</p>
+              <p id="vCurrent" class="text-xs text-slate-500">--</p>
+              <p id="vWeek" class="text-xs text-slate-500">--</p>
+            </div>
+          </div>
+          <div id="vAlerts" class="mt-4 space-y-1.5"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">🔌 AgroClima API v1 · FastAPI + Google Apps Script · Datos: Open-Meteo</footer>
+
+  <script src="gas-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    'use strict';
+    const session = requireAuth('dashboard.view');
+    renderUserBadge();
+    document.getElementById('curlBase').textContent = window.location.origin;
+
+    // ─── API keys ───
+    async function loadKeys() {
+      try {
+        const res = await apiFetch('/api/apikeys');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const keys = await res.json();
+        const list = document.getElementById('keysList');
+        const pick = document.getElementById('tApiKey');
+        list.innerHTML = ''; pick.innerHTML = '';
+        document.getElementById('keysEmpty').style.display = keys.length ? 'none' : 'block';
+        keys.forEach((k) => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200';
+          div.innerHTML = `
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-slate-700">${k.name} <span class="font-normal text-slate-400">· ${k.calls} llamadas · ${k.created}</span></p>
+              <p class="text-[11px] font-mono text-slate-500 truncate">${k.key}</p>
+            </div>
+            <div class="flex gap-1.5 flex-none">
+              <button data-copy="${k.key}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-bold hover:border-agro-500 transition">📋</button>
+              <button data-del="${k.id}" class="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-bold text-red-500 hover:border-red-400 transition">🗑️</button>
+            </div>`;
+          list.appendChild(div);
+          const opt = document.createElement('option');
+          opt.value = k.key; opt.textContent = k.name + ' · ' + k.key.slice(0, 18) + '…';
+          pick.appendChild(opt);
+        });
+        list.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', () => {
+          navigator.clipboard.writeText(b.dataset.copy).then(() => keysMsg(true, '📋 Clave copiada al portapapeles.'));
+        }));
+        list.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+          if (!confirm('¿Revocar esta API key? Las integraciones que la usen dejarán de funcionar.')) return;
+          await apiFetch('/api/apikeys/' + b.dataset.del, { method: 'DELETE' });
+          loadKeys();
+        }));
+      } catch (e) {
+        keysMsg(false, '⚠️ Necesitas sesión del backend real (FastAPI) para gestionar claves. ' + e.message);
+      }
+    }
+    function keysMsg(ok, text) {
+      const m = document.getElementById('keysMsg');
+      m.classList.remove('hidden');
+      m.className = 'text-xs font-semibold mt-2 ' + (ok ? 'text-green-600' : 'text-amber-600');
+      m.textContent = text;
+      setTimeout(() => m.classList.add('hidden'), 4000);
+    }
+    document.getElementById('btnNewKey').addEventListener('click', async () => {
+      const name = prompt('Nombre de la integración (ej: "App móvil", "ERP fundo"):', 'Integración');
+      if (!name) return;
+      try {
+        const res = await apiFetch('/api/apikeys', { method: 'POST', body: JSON.stringify({ name }) });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.detail || 'error');
+        keysMsg(true, '✅ Clave generada: ' + j.key.slice(0, 20) + '… (cópiala ahora)');
+        loadKeys();
+      } catch (e) { keysMsg(false, '⚠️ ' + e.message); }
+    });
+
+    // ─── Consola en vivo ───
+    document.getElementById('tAuth').addEventListener('change', (e) => {
+      document.getElementById('apiKeyPickWrap').classList.toggle('hidden', e.target.value !== 'apikey');
+    });
+
+    document.getElementById('btnRun').addEventListener('click', async () => {
+      const btn = document.getElementById('btnRun');
+      const respBox = document.getElementById('respBox');
+      const meta = document.getElementById('respMeta');
+      btn.disabled = true; btn.textContent = '⏳ Ejecutando…';
+      respBox.textContent = '// Consultando el motor analítico en el servidor…';
+      const body = {
+        lat: parseFloat(document.getElementById('tLat').value),
+        lon: parseFloat(document.getElementById('tLon').value),
+        crop: document.getElementById('tCrop').value,
+      };
+      const headers = { 'Content-Type': 'application/json' };
+      if (document.getElementById('tAuth').value === 'apikey') {
+        const k = document.getElementById('tApiKey').value;
+        if (!k) { respBox.textContent = '// ⚠️ Genera primero una API key.'; btn.disabled = false; btn.textContent = '▶ Ejecutar petición'; return; }
+        headers['X-API-Key'] = k;
+      } else if (getToken()) {
+        headers['Authorization'] = 'Bearer ' + getToken();
+      }
+      const t0 = performance.now();
+      try {
+        const res = await fetch('/api/v1/analyze', { method: 'POST', headers, body: JSON.stringify(body) });
+        const ms = Math.round(performance.now() - t0);
+        const j = await res.json();
+        meta.textContent = 'HTTP ' + res.status + ' · ' + ms + ' ms';
+        respBox.textContent = JSON.stringify(j, null, 2);
+        if (res.ok) renderVisual(j);
+        else document.getElementById('visualBox').classList.add('hidden');
+      } catch (e) {
+        meta.textContent = 'error';
+        respBox.textContent = '// ❌ ' + e.message + '\n// ¿Está corriendo el backend FastAPI?';
+      } finally {
+        btn.disabled = false; btn.textContent = '▶ Ejecutar petición';
+      }
+    });
+
+    function renderVisual(j) {
+      const box = document.getElementById('visualBox');
+      box.classList.remove('hidden');
+      const score = document.getElementById('vScore');
+      score.textContent = j.score;
+      score.className = 'text-5xl font-black ' + (j.score >= 70 ? 'text-green-600' : j.score >= 40 ? 'text-amber-500' : 'text-red-500');
+      const statusMap = { favorable: '🌿 Condiciones favorables', regular: '⚠️ Condiciones regulares', adverso: '🚨 Condiciones adversas' };
+      document.getElementById('vStatus').textContent = (statusMap[j.status] || j.status) + ' · ' + j.crop.name;
+      document.getElementById('vCurrent').textContent =
+        `Ahora: ${j.current.temperature_c}°C · humedad ${j.current.humidity_pct}% · viento ${j.current.wind_kmh} km/h` + (j.current.sky ? ' · ' + j.current.sky : '');
+      document.getElementById('vWeek').textContent =
+        `Semana: ${j.week.rain_total_mm} mm de lluvia · mín ${j.week.t_min_c}°C · máx ${j.week.t_max_c}°C · UV ${j.week.uv_max}`;
+      const al = document.getElementById('vAlerts');
+      al.innerHTML = '';
+      if (!j.alerts.length) {
+        al.innerHTML = '<p class="text-xs font-bold text-green-600 bg-green-50 border border-green-200 rounded-lg px-3 py-2">🛡️ Sin alertas activas</p>';
+      } else {
+        j.alerts.forEach((a) => {
+          const cls = a.level === 'danger' ? 'text-red-600 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+          al.innerHTML += `<p class="text-xs font-bold border rounded-lg px-3 py-2 ${cls}">${a.type}: <span class="font-normal">${a.message}</span></p>`;
+        });
+      }
+    }
+
+    loadKeys();
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38767e18de10cdd',t:'MTc4ODk2OTYyNQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

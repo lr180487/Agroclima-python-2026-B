@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgroClima · Estado de APIs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { agro: {50:'#f0fdf4',100:'#dcfce7',500:'#22c55e',600:'#16a34a',700:'#15803d',800:'#166534',900:'#14532d'} },
+        fontFamily: { sans: ['Inter','ui-sans-serif','system-ui','sans-serif'], mono: ['ui-monospace','SFMono-Regular','monospace'] },
+      }}
+    };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="theme.css" />
+  <script src="theme.js"></script>
+  <style>
+    .pulse-ok  { animation: pk 2s ease-in-out infinite; }
+    @keyframes pk { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+    .lat-bar { height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .lat-fill { height: 100%; border-radius: 999px; transition: width .6s ease, background .3s; }
+  </style>
+</head>
+<body class="font-sans bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ═══════ NAVBAR ═══════ -->
+  <header class="bg-gradient-to-r from-agro-800 via-agro-700 to-emerald-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+      <a href="landing.html" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-xl">🌱</span> AgroClima
+      </a>
+      <nav class="hidden md:flex items-center gap-1 text-sm font-semibold">
+        <a href="index.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📊 Dashboard</a>
+        <a href="mapa.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🗺️ Mapa</a>
+        <a href="notificaciones.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">📧 Notificaciones</a>
+        <a href="api.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">🔌 API</a>
+        <a href="estado.html" class="px-4 py-2 rounded-xl bg-white/15 border border-white/20">📡 Estado</a>
+        <a href="config.html" class="px-4 py-2 rounded-xl hover:bg-white/10 transition">⚙️ Configuración</a>
+      </nav>
+      <div id="userBadge"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl font-black text-slate-900">📡 Estado de APIs e integraciones</h1>
+        <p class="text-sm text-slate-400 mt-1">Monitoreo en vivo de los servicios que alimentan AgroClima · auto-refresco cada 60 s</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="globalBadge" class="px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-sm font-black">Verificando…</span>
+        <button id="btnCheck" class="px-5 py-2.5 rounded-xl bg-agro-600 hover:bg-agro-700 text-white text-sm font-bold shadow-md shadow-agro-600/25 transition active:scale-95">↻ Verificar ahora</button>
+      </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center">
+        <p id="sumOk" class="text-3xl font-black text-green-600">--</p>
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-400 mt-1">Operativas</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center">
+        <p id="sumWarn" class="text-3xl font-black text-amber-500">--</p>
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-400 mt-1">No configuradas</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 text-center">
+        <p id="sumFail" class="text-3xl font-black text-red-500">--</p>
+        <p class="text-xs font-bold uppercase tracking-wide text-slate-400 mt-1">Con fallas</p>
+      </div>
+    </div>
+
+    <!-- Tarjetas de servicios -->
+    <div id="servicesGrid" class="grid md:grid-cols-2 gap-4"></div>
+
+    <p class="text-center text-xs text-slate-400 mt-6">Última verificación: <span id="lastCheck" class="font-bold">--</span> · Latencia medida desde tu navegador</p>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-500 text-xs py-4 text-center">📡 AgroClima · Panel de estado de integraciones</footer>
+
+  <script src="gas-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    'use strict';
+    const session = requireAuth('dashboard.view');
+    renderUserBadge();
+
+    // ─── Definición de los chequeos ───
+    const SERVICES = [
+      {
+        id: 'openmeteo', icon: '🌦️', name: 'Open-Meteo', role: 'Clima y pronóstico',
+        endpoint: 'api.open-meteo.com/v1/forecast',
+        check: async () => {
+          const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=-12.05&longitude=-77.04&current=temperature_2m');
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          return 'Lima ahora: ' + j.current.temperature_2m + '°C';
+        },
+      },
+      {
+        id: 'nominatim', icon: '📍', name: 'Nominatim (OSM)', role: 'Geocodificación',
+        endpoint: 'nominatim.openstreetmap.org/search',
+        check: async () => {
+          const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=pe&q=Cusco');
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          return j.length ? 'Resuelve "Cusco" → (' + (+j[0].lat).toFixed(2) + ', ' + (+j[0].lon).toFixed(2) + ')' : 'Sin resultados';
+        },
+      },
+      {
+        id: 'rainviewer', icon: '🌧️', name: 'RainViewer', role: 'Radar de lluvia en vivo',
+        endpoint: 'api.rainviewer.com/public/weather-maps.json',
+        check: async () => {
+          const r = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          const last = j.radar && j.radar.past && j.radar.past.slice(-1)[0];
+          if (!last) throw new Error('sin frames de radar');
+          const mins = Math.round((Date.now() / 1000 - last.time) / 60);
+          return 'Último frame de radar: hace ' + mins + ' min';
+        },
+      },
+      {
+        id: 'osmtiles', icon: '🗺️', name: 'OSM Tiles', role: 'Mosaicos del mapa',
+        endpoint: 'tile.openstreetmap.org',
+        check: () => new Promise((resolve, reject) => {
+          const img = new Image();
+          const t = setTimeout(() => { img.src = ''; reject(new Error('timeout 8s')); }, 8000);
+          img.onload = () => { clearTimeout(t); resolve('Tile de prueba cargado (zoom 6, Perú)'); };
+          img.onerror = () => { clearTimeout(t); reject(new Error('no cargó el tile')); };
+          img.src = 'https://tile.openstreetmap.org/6/18/34.png?t=' + Date.now();
+        }),
+      },
+      {
+        id: 'fastapi', icon: '⚡', name: 'Backend FastAPI', role: 'Auth JWT + BD (SQLite/PostgreSQL)',
+        endpoint: '/api/health (mismo origen)',
+        check: async () => {
+          const r = await fetch('/api/health');
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const j = await r.json();
+          return 'BD: ' + j.database + ' · OAuth: ' + j.oauth_google;
+        },
+      },
+      {
+        id: 'gas', icon: '☁️', name: 'Backend Google Apps Script', role: 'Auth + PostgreSQL/Sheets en la nube',
+        endpoint: 'script.google.com/macros/…/exec', optional: true,
+        check: async () => {
+          if (!gasEnabled()) { const e = new Error('Sin configurar — pega la URL /exec en Configuración → Sistema'); e.warn = true; throw e; }
+          const h = await gasHealth();
+          return 'Storage: ' + h.storage + ' · OAuth: ' + h.oauth_google;
+        },
+      },
+    ];
+
+    // ─── Render de tarjetas ───
+    const grid = document.getElementById('servicesGrid');
+    SERVICES.forEach((s) => {
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm p-5';
+      card.innerHTML = `
+        <div class="flex items-start justify-between mb-2">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">${s.icon}</span>
+            <div>
+              <p class="font-black text-slate-800">${s.name}</p>
+              <p class="text-[11px] text-slate-400">${s.role}</p>
+            </div>
+          </div>
+          <span id="st-${s.id}" class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-400 text-[10px] font-black whitespace-nowrap">⏳ …</span>
+        </div>
+        <p class="text-[11px] font-mono text-slate-400 mb-3">${s.endpoint}</p>
+        <div class="lat-bar mb-1.5"><div id="lat-${s.id}" class="lat-fill" style="width:0%"></div></div>
+        <div class="flex justify-between items-center">
+          <p id="det-${s.id}" class="text-xs text-slate-500 flex-1">—</p>
+          <p id="ms-${s.id}" class="text-xs font-black font-mono text-slate-600 ml-2">-- ms</p>
+        </div>`;
+      grid.appendChild(card);
+    });
+
+    // ─── Ejecutar chequeos ───
+    async function checkService(s) {
+      const st = document.getElementById('st-' + s.id);
+      const det = document.getElementById('det-' + s.id);
+      const ms = document.getElementById('ms-' + s.id);
+      const lat = document.getElementById('lat-' + s.id);
+      st.className = 'px-2.5 py-1 rounded-full bg-slate-100 text-slate-400 text-[10px] font-black whitespace-nowrap';
+      st.textContent = '⏳ verificando';
+      const t0 = performance.now();
+      try {
+        const detail = await s.check();
+        const elapsed = Math.round(performance.now() - t0);
+        st.className = 'px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-black whitespace-nowrap pulse-ok';
+        st.textContent = '● OPERATIVA';
+        det.textContent = detail;
+        ms.textContent = elapsed + ' ms';
+        const pct = Math.min(100, (elapsed / 3000) * 100);
+        lat.style.width = Math.max(6, pct) + '%';
+        lat.style.background = elapsed < 800 ? '#22c55e' : elapsed < 2000 ? '#eab308' : '#ef4444';
+        return 'ok';
+      } catch (e) {
+        const elapsed = Math.round(performance.now() - t0);
+        ms.textContent = elapsed + ' ms';
+        det.textContent = e.message;
+        lat.style.width = '100%';
+        if (e.warn) {
+          st.className = 'px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black whitespace-nowrap';
+          st.textContent = '○ NO CONFIGURADA';
+          lat.style.background = '#f59e0b';
+          return 'warn';
+        }
+        st.className = 'px-2.5 py-1 rounded-full bg-red-100 text-red-600 text-[10px] font-black whitespace-nowrap';
+        st.textContent = '✕ FALLA';
+        lat.style.background = '#ef4444';
+        return 'fail';
+      }
+    }
+
+    async function checkAll() {
+      const results = await Promise.all(SERVICES.map(checkService));
+      const ok = results.filter((r) => r === 'ok').length;
+      const warn = results.filter((r) => r === 'warn').length;
+      const fail = results.filter((r) => r === 'fail').length;
+      document.getElementById('sumOk').textContent = ok;
+      document.getElementById('sumWarn').textContent = warn;
+      document.getElementById('sumFail').textContent = fail;
+      const g = document.getElementById('globalBadge');
+      if (fail === 0) {
+        g.className = 'px-4 py-2 rounded-xl bg-green-100 text-green-700 text-sm font-black';
+        g.textContent = '✅ Todos los sistemas operativos';
+      } else {
+        g.className = 'px-4 py-2 rounded-xl bg-red-100 text-red-600 text-sm font-black';
+        g.textContent = '⚠️ ' + fail + ' servicio(s) con fallas';
+      }
+      document.getElementById('lastCheck').textContent =
+        new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    document.getElementById('btnCheck').addEventListener('click', checkAll);
+    checkAll();
+    setInterval(checkAll, 60000);
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a38768370faf0cdd',t:'MTc4ODk2OTYzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
